@@ -21,15 +21,32 @@ import (
 	"time"
 )
 
+// timeout15 is a constant representing a timeout duration of 15 seconds.
 const (
 	timeout15 = time.Duration(15) * time.Second
 )
 
+// Client represents an SNMP client that allows connecting to a target SNMP device.
 type Client struct {
 	Target    string
 	Community string
 }
 
+// Connect establishes a connection to the SNMP target using the provided parameters,
+// and returns a GoSNMP client instance along with any error encountered during connection.
+// The function sets the default SNMP port to 161 and the SNMP version to 2c.
+// The function also sets the timeout duration to 15 seconds.
+// If an error occurs while connecting to the target, nil is returned along with the error.
+//
+// Example usage:
+// snmpClient, err := client.Connect()
+//
+//	if err != nil {
+//	    log.Fatal(err)
+//	}
+//
+// defer snmpClient.Conn.Close()
+// ...
 func (s *Client) Connect() (*gosnmp.GoSNMP, error) {
 	snmpClient := &gosnmp.GoSNMP{
 		Target:    s.Target,
@@ -46,6 +63,9 @@ func (s *Client) Connect() (*gosnmp.GoSNMP, error) {
 	return snmpClient, nil
 }
 
+// GetValue retrieves SNMP values for the given OIDs using the client's connection.
+// It returns the SNMP packet containing the result values, the duration of the SNMP request,
+// and any error encountered during the process.
 func (s *Client) GetValue(oids []string) (*gosnmp.SnmpPacket, time.Duration, error) {
 	snmpClient, err := s.Connect()
 	if err != nil {

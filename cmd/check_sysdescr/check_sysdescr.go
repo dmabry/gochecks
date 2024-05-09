@@ -24,6 +24,29 @@ import (
 	"regexp"
 )
 
+// CheckSysDescr checks the sysDescr value of an SNMP target using a regular expression pattern.
+// It takes the SNMP client, the expected sysDescr regular expression pattern, and a boolean flag to enable performance data.
+// It returns a CheckResult struct with the result of the check and the performance data (if enabled).
+//
+// The function retrieves the sysDescr value using the GetValue method of the SNMP client.
+// If an error occurs while retrieving the value, a critical check result is returned with an error message.
+//
+// If the expectedSysDescrRegExp is provided, the function compares the sysDescr value with the regular expression pattern.
+// If it does not match, a critical check result is returned with an error message.
+//
+// Otherwise, an OK check result is returned with the sysDescr value.
+//
+// If enablePerfData is true, the function adds the SNMP latency to the performance data of the check result.
+// The latency is measured as the duration of the SNMP request.
+//
+// Example usage:
+//
+//	snmpClient := snmp.Client{
+//	    Target:    "127.0.0.1",
+//	    Community: "public",
+//	}
+//	result := CheckSysDescr(&snmpClient, "Cisco", true)
+//	result.SendResult()
 func CheckSysDescr(snmpClient *snmp.Client, expectedSysDescrRegExp string, enablePerfData bool) *gomonitor.CheckResult {
 	oids := []string{"1.3.6.1.2.1.1.1.0"}
 
@@ -57,6 +80,9 @@ func CheckSysDescr(snmpClient *snmp.Client, expectedSysDescrRegExp string, enabl
 	return checkResult
 }
 
+// main is the entry point of the program. It parses command-line flags, creates an SNMP client,
+// and performs a check on the target SNMP device using the CheckSysDescr function.
+// The result of the check is then sent using the SendResult method.
 func main() {
 	target := flag.String("target", "127.0.0.1", "The target SNMP device.")
 	community := flag.String("community", "public", "The SNMP community string.")
