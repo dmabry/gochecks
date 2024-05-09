@@ -1,0 +1,26 @@
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.tgz
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool, specifically when used with LiteIDE
+*.out
+
+# Leave out idea
+.idea/
+
+# Dependency directories (remove the comment below to include it)
+vendor/
+bin/
+# Ignore default recorded_flows dir
+recorded_flows/
+# Ignore all prod
+prod_*
+
+dist/
