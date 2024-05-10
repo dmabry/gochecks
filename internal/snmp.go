@@ -84,3 +84,30 @@ func (s *Client) GetValue(oids []string) (*gosnmp.SnmpPacket, time.Duration, err
 
 	return result, latency, nil
 }
+
+// Walk retrieves SNMP tree for the given OID using the client's connection.
+// It returns a map with the OID as the key and its value as the value,
+// the duration of the SNMP request, and any error encountered during the process.
+func (s *Client) Walk(baseOid string) (map[string]interface{}, time.Duration, error) {
+	snmpClient, err := s.Connect()
+	if err != nil {
+		return nil, 0, err
+	}
+	defer snmpClient.Conn.Close()
+
+	start := time.Now()
+
+	oidValues := make(map[string]interface{})
+
+	err = snmpClient.BulkWalk(baseOid, func(pdu gosnmp.SnmpPDU) error {
+		oidValues[pdu.Name] = pdu.Value
+		return nil
+	})
+	if err != nil {
+		return nil, 0, err
+	}
+
+	latency := time.Since(start)
+
+	return oidValues, latency, nil
+}
