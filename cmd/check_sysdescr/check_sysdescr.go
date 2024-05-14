@@ -19,7 +19,7 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/dmabry/gochecks/internal"
+	"github.com/dmabry/gochecks/internal/snmp"
 	"github.com/dmabry/gomonitor"
 	"regexp"
 )
