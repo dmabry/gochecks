@@ -156,25 +156,25 @@ func updateInterfaceDetails(ifaceDetails *interfaces.InterfaceDetail, oid string
 		} else {
 			log.Printf("Value for OID %s is not of type []byte: %T -> %v\n", oid, value, value)
 		}
-	case interfaces.OIDHCInOctets:
+	case interfaces.OIDIfHCInOctets:
 		if val, ok := value.(uint64); ok {
 			ifaceDetails.HCInOctets = val
 		} else {
 			log.Printf("Value for OID %s is not of type uint64: %T -> %v\n", oid, value, value)
 		}
-	case interfaces.OIDHCOutOctets:
+	case interfaces.OIDIfHCOutOctets:
 		if val, ok := value.(uint64); ok {
 			ifaceDetails.HCOutOctets = val
 		} else {
 			log.Printf("Value for OID %s is not of type uint64: %T -> %v\n", oid, value, value)
 		}
-	case interfaces.OIDHCInUcastPkts:
+	case interfaces.OIDIfHCInUcastPkts:
 		if val, ok := value.(uint64); ok {
 			ifaceDetails.HCInUcastPkts = val
 		} else {
 			log.Printf("Value for OID %s is not of type uint64: %T -> %v\n", oid, value, value)
 		}
-	case interfaces.OIDHCOutUcastPkts:
+	case interfaces.OIDIfHCOutUcastPkts:
 		if val, ok := value.(uint64); ok {
 			ifaceDetails.HCOutUcastPkts = val
 		} else {
