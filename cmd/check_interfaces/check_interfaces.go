@@ -18,46 +18,397 @@ package main
 
 import (
 	"encoding/hex"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"github.com/dmabry/gochecks/internal"
 	"github.com/dmabry/gomonitor"
-	"regexp"
+	"log"
 	"strconv"
 	"strings"
 )
 
 type InterfaceDetail struct {
-	Description    string
-	Name           string
-	Alias          string
-	Type           int
-	Index          int
-	Speed          uint
-	HighSpeed      uint
-	OperStatus     int
-	AdminStatus    int
-	MTU            int
-	InOctets       uint
-	OutOctets      uint
-	HCInOctets     uint64
-	HCOutOctets    uint64
-	HCInUcastPkts  uint64
-	HCOutUcastPkts uint64
-	InDiscards     uint
-	OutDiscards    uint
-	InErrors       uint
-	OutErrors      uint
-	InUcastPkts    uint
-	OutUcastPkts   uint
-	InNUcastPkts   uint
-	OutNUcastPkts  uint
-	LastChange     uint32
-	PhysAddress    string
+	// Basic Info
+	Description string
+	Name        string
+	Alias       string
+	PhysAddress string
+
+	// Identification and Types
+	Index int
+	Type  int
+	MTU   int
+
+	// Speeds
+	Speed     uint
+	HighSpeed uint
+
+	// Status
+	OperStatus  int
+	AdminStatus int
+
+	// Octets
+	InOctets    uint
+	OutOctets   uint
+	HCInOctets  uint64
+	HCOutOctets uint64
+
+	// Packets
+	InUcastPkts        uint
+	OutUcastPkts       uint
+	HCInUcastPkts      uint64
+	HCOutUcastPkts     uint64
+	InMulticastPkts    uint
+	OutMulticastPkts   uint
+	HCInMulticastPkts  uint64
+	HCOutMulticastPkts uint64
+	InBroadcastPkts    uint
+	OutBroadcastPkts   uint
+	HCInBroadcastPkts  uint64
+	HCOutBroadcastPkts uint64
+	InNUcastPkts       uint
+	OutNUcastPkts      uint
+
+	// Errors and Discards
+	InErrors    uint
+	OutErrors   uint
+	InDiscards  uint
+	OutDiscards uint
+
+	// Miscellaneous
+	LastChange               uint32
+	LinkUpDownTrapEnable     int
+	PromiscuousMode          int
+	ConnectorPresent         int
+	CounterDiscontinuityTime uint32
 }
 
+func (ifaceDetail *InterfaceDetail) renderToString(index int) string {
+	const (
+		outputFormat = "Interface index: %d\nDescription: %s\nAlias: %s\nName: %s\nType: %d\nSpeed: %d\nHighSpeed: %d\nOperStatus: %d\nAdminStatus: %d\nInOctets: %d\nOutOctets: %d\nHCInOctets: %d\nHCOutOctets: %d\nHCInUcastPkts: %d\nHCOutUcastPkts: %d\nInErrors: %d\nOutErrors: %d\nInUcastPkts: %d\nOutUcastPkts: %d\nInNUcastPkts: %d\nOutNUcastPkts: %d\nPromiscuousMode: %d\nLastChange: %d\nPhysAddress: %s\n\n"
+	)
+	return fmt.Sprintf(outputFormat,
+		index,
+		ifaceDetail.Description,
+		ifaceDetail.Alias,
+		ifaceDetail.Name,
+		ifaceDetail.Type,
+		ifaceDetail.Speed,
+		ifaceDetail.HighSpeed,
+		ifaceDetail.OperStatus,
+		ifaceDetail.AdminStatus,
+		ifaceDetail.InOctets,
+		ifaceDetail.OutOctets,
+		ifaceDetail.HCInOctets,
+		ifaceDetail.HCOutOctets,
+		ifaceDetail.HCInUcastPkts,
+		ifaceDetail.HCOutUcastPkts,
+		ifaceDetail.InErrors,
+		ifaceDetail.OutErrors,
+		ifaceDetail.InUcastPkts,
+		ifaceDetail.OutUcastPkts,
+		ifaceDetail.InNUcastPkts,
+		ifaceDetail.OutNUcastPkts,
+		ifaceDetail.PromiscuousMode,
+		ifaceDetail.LastChange,
+		ifaceDetail.PhysAddress)
+}
+
+func (ifaceDetail *InterfaceDetail) toJsonString() (string, error) {
+	jsonBytes, err := json.Marshal(ifaceDetail)
+	if err != nil {
+		return "", err
+	}
+
+	jsonString := string(jsonBytes)
+	return jsonString, nil
+}
+
+const (
+	OIDIfDescr                    = ".1.3.6.1.2.1.2.2.1.2"
+	OIDIfName                     = ".1.3.6.1.2.1.31.1.1.1.1"
+	OIDIfAlias                    = ".1.3.6.1.2.1.31.1.1.1.18"
+	OIDIfPhysAddress              = ".1.3.6.1.2.1.2.2.1.6"
+	OIDIfIndex                    = ".1.3.6.1.2.1.2.2.1.1"
+	OIDIfType                     = ".1.3.6.1.2.1.2.2.1.3"
+	OIDIfMTU                      = ".1.3.6.1.2.1.2.2.1.4"
+	OIDIfSpeed                    = ".1.3.6.1.2.1.2.2.1.5"
+	OIDIfHighSpeed                = ".1.3.6.1.2.1.31.1.1.1.15"
+	OIDIfOperStatus               = ".1.3.6.1.2.1.2.2.1.8"
+	OIDIfAdminStatus              = ".1.3.6.1.2.1.2.2.1.7"
+	OIDIfInOctets                 = ".1.3.6.1.2.1.2.2.1.10"
+	OIDIfOutOctets                = ".1.3.6.1.2.1.2.2.1.16"
+	OIDHCInOctets                 = ".1.3.6.1.2.1.31.1.1.1.6"
+	OIDHCOutOctets                = ".1.3.6.1.2.1.31.1.1.1.10"
+	OIDIfInUcastPkts              = ".1.3.6.1.2.1.2.2.1.11"
+	OIDIfOutUcastPkts             = ".1.3.6.1.2.1.2.2.1.17"
+	OIDHCInUcastPkts              = ".1.3.6.1.2.1.31.1.1.1.7"
+	OIDHCOutUcastPkts             = ".1.3.6.1.2.1.31.1.1.1.11"
+	OIDIfInBroadcastPkts          = ".1.3.6.1.2.1.31.1.1.1.3"
+	OIDIfOutBroadcastPkts         = ".1.3.6.1.2.1.31.1.1.1.5"
+	OIDIfHCInBroadcastPkts        = ".1.3.6.1.2.1.31.1.1.1.9"
+	OIDIfHCOutBroadcastPkts       = ".1.3.6.1.2.1.31.1.1.1.13"
+	OIDIfInMulticastPkts          = ".1.3.6.1.2.1.31.1.1.1.2"
+	OIDIfOutMulticastPkts         = ".1.3.6.1.2.1.31.1.1.1.4"
+	OIDIfHCInMulticastPkts        = ".1.3.6.1.2.1.31.1.1.1.8"
+	OIDIfHCOutMulticastPkts       = ".1.3.6.1.2.1.31.1.1.1.12"
+	OIDIfOutNUcastPkts            = ".1.3.6.1.2.1.2.2.1.15"
+	OIDIfInErrors                 = ".1.3.6.1.2.1.2.2.1.14"
+	OIDIfOutErrors                = ".1.3.6.1.2.1.2.2.1.20"
+	OIDIfInDiscards               = ".1.3.6.1.2.1.2.2.1.13"
+	OIDIfOutDiscards              = ".1.3.6.1.2.1.2.2.1.19"
+	OIDIfLastChange               = ".1.3.6.1.2.1.2.2.1.9"
+	OIDIfLinkUpDownTrapEnable     = ".1.3.6.1.2.1.31.1.1.1.14"
+	OIDIfPromiscuousMode          = ".1.3.6.1.2.1.31.1.1.1.16"
+	OIDIfConnectorPresent         = ".1.3.6.1.2.1.31.1.1.1.17"
+	OIDIfCounterDiscontinuityTime = ".1.3.6.1.2.1.31.1.1.1.19"
+)
+
+func updateInterfaceDetails(ifaceDetails *InterfaceDetail, oid string, value interface{}) {
+	switch oid {
+	case OIDIfIndex:
+		if val, ok := value.(int); ok {
+			ifaceDetails.Index = val
+		} else {
+			log.Printf("Value for OID %s is not of type int: %T -> %v\n", oid, value, value)
+		}
+	case OIDIfDescr:
+		if val, ok := value.([]byte); ok {
+			ifaceDetails.Description = string(val)
+		} else {
+			log.Printf("Value for OID %s is not of type []byte: %T -> %v\n", oid, value, value)
+		}
+	case OIDIfType:
+		if val, ok := value.(int); ok {
+			ifaceDetails.Type = val
+		} else {
+			log.Printf("Value for OID %s is not of type int: %T -> %v\n", oid, value, value)
+		}
+	case OIDIfMTU:
+		if val, ok := value.(int); ok {
+			ifaceDetails.MTU = val
+		} else {
+			log.Printf("Value for OID %s is not of type int: %T -> %v\n", oid, value, value)
+		}
+	case OIDIfSpeed:
+		if val, ok := value.(uint); ok {
+			ifaceDetails.Speed = val
+		} else {
+			log.Printf("Value for OID %s is not of type uint: %T -> %v\n", oid, value, value)
+		}
+	case OIDIfHighSpeed:
+		if val, ok := value.(uint); ok {
+			ifaceDetails.HighSpeed = val
+		} else {
+			log.Printf("Value for OID %s is not of type uint: %T -> %v\n", oid, value, value)
+		}
+	case OIDIfPhysAddress:
+		if val, ok := value.([]byte); ok {
+			ifaceDetails.PhysAddress = hex.EncodeToString(val)
+		} else {
+			log.Printf("Value for OID %s is not of type []byte: %T -> %v\n", oid, value, value)
+		}
+	case OIDIfAdminStatus:
+		if val, ok := value.(int); ok {
+			ifaceDetails.AdminStatus = val
+		} else {
+			log.Printf("Value for OID %s is not of type int: %T -> %v\n", oid, value, value)
+		}
+	case OIDIfOperStatus:
+		if val, ok := value.(int); ok {
+			ifaceDetails.OperStatus = val
+		} else {
+			log.Printf("Value for OID %s is not of type int: %T -> %v\n", oid, value, value)
+		}
+	case OIDIfLastChange:
+		if val, ok := value.(uint32); ok {
+			ifaceDetails.LastChange = val
+		} else {
+			log.Printf("Value for OID %s is not of type uint32: %T -> %v\n", oid, value, value)
+		}
+	case OIDIfInOctets:
+		if val, ok := value.(uint); ok {
+			ifaceDetails.InOctets = val
+		} else {
+			log.Printf("Value for OID %s is not of type uint: %T -> %v\n", oid, value, value)
+		}
+	case OIDIfInUcastPkts:
+		if val, ok := value.(uint); ok {
+			ifaceDetails.InUcastPkts = val
+		} else {
+			log.Printf("Value for OID %s is not of type uint: %T -> %v\n", oid, value, value)
+		}
+	case OIDIfInDiscards:
+		if val, ok := value.(uint); ok {
+			ifaceDetails.InDiscards = val
+		} else {
+			log.Printf("Value for OID %s is not of type uint: %T -> %v\n", oid, value, value)
+		}
+	case OIDIfInErrors:
+		if val, ok := value.(uint); ok {
+			ifaceDetails.InErrors = val
+		} else {
+			log.Printf("Value for OID %s is not of type uint: %T -> %v\n", oid, value, value)
+		}
+	case OIDIfOutOctets:
+		if val, ok := value.(uint); ok {
+			ifaceDetails.OutOctets = val
+		} else {
+			log.Printf("Value for OID %s is not of type uint: %T -> %v\n", oid, value, value)
+		}
+	case OIDIfOutUcastPkts:
+		if val, ok := value.(uint); ok {
+			ifaceDetails.OutUcastPkts = val
+		} else {
+			log.Printf("Value for OID %s is not of type uint: %T -> %v\n", oid, value, value)
+		}
+	case OIDIfOutDiscards:
+		if val, ok := value.(uint); ok {
+			ifaceDetails.OutDiscards = val
+		} else {
+			log.Printf("Value for OID %s is not of type uint: %T -> %v\n", oid, value, value)
+		}
+	case OIDIfOutErrors:
+		if val, ok := value.(uint); ok {
+			ifaceDetails.OutErrors = val
+		} else {
+			log.Printf("Value for OID %s is not of type uint: %T -> %v\n", oid, value, value)
+		}
+	case OIDIfOutNUcastPkts:
+		if val, ok := value.(uint); ok {
+			ifaceDetails.OutNUcastPkts = val
+		} else {
+			log.Printf("Value for OID %s is not of type uint: %T -> %v\n", oid, value, value)
+		}
+	case OIDIfName:
+		if val, ok := value.([]byte); ok {
+			ifaceDetails.Name = string(val)
+		} else {
+			log.Printf("Value for OID %s is not of type []byte: %T -> %v\n", oid, value, value)
+		}
+	case OIDIfAlias:
+		if val, ok := value.([]byte); ok {
+			ifaceDetails.Alias = string(val)
+		} else {
+			log.Printf("Value for OID %s is not of type []byte: %T -> %v\n", oid, value, value)
+		}
+	case OIDHCInOctets:
+		if val, ok := value.(uint64); ok {
+			ifaceDetails.HCInOctets = val
+		} else {
+			log.Printf("Value for OID %s is not of type uint64: %T -> %v\n", oid, value, value)
+		}
+	case OIDHCOutOctets:
+		if val, ok := value.(uint64); ok {
+			ifaceDetails.HCOutOctets = val
+		} else {
+			log.Printf("Value for OID %s is not of type uint64: %T -> %v\n", oid, value, value)
+		}
+	case OIDHCInUcastPkts:
+		if val, ok := value.(uint64); ok {
+			ifaceDetails.HCInUcastPkts = val
+		} else {
+			log.Printf("Value for OID %s is not of type uint64: %T -> %v\n", oid, value, value)
+		}
+	case OIDHCOutUcastPkts:
+		if val, ok := value.(uint64); ok {
+			ifaceDetails.HCOutUcastPkts = val
+		} else {
+			log.Printf("Value for OID %s is not of type uint64: %T -> %v\n", oid, value, value)
+		}
+	case OIDIfHCInMulticastPkts:
+		if val, ok := value.(uint64); ok {
+			ifaceDetails.HCInMulticastPkts = val
+		} else {
+			log.Printf("Value for OID %s is not of type uint64: %T -> %v\n", oid, value, value)
+		}
+	case OIDIfHCInBroadcastPkts:
+		if val, ok := value.(uint64); ok {
+			ifaceDetails.HCInBroadcastPkts = val
+		} else {
+			log.Printf("Value for OID %s is not of type uint64: %T -> %v\n", oid, value, value)
+		}
+	case OIDIfHCOutBroadcastPkts:
+		if val, ok := value.(uint64); ok {
+			ifaceDetails.HCOutBroadcastPkts = val
+		} else {
+			log.Printf("Value for OID %s is not of type uint64: %T -> %v\n", oid, value, value)
+		}
+	case OIDIfLinkUpDownTrapEnable:
+		if val, ok := value.(int); ok {
+			ifaceDetails.LinkUpDownTrapEnable = val
+		} else {
+			log.Printf("Value for OID %s is not of type int: %T -> %v\n", oid, value, value)
+		}
+	case OIDIfConnectorPresent:
+		if val, ok := value.(int); ok {
+			ifaceDetails.ConnectorPresent = val
+		} else {
+			log.Printf("Value for OID %s is not of type int: %T -> %v\n", oid, value, value)
+		}
+	case OIDIfOutBroadcastPkts:
+		if val, ok := value.(uint); ok {
+			ifaceDetails.OutBroadcastPkts = val
+		} else {
+			log.Printf("Value for OID %s is not of type uint: %T -> %v\n", oid, value, value)
+		}
+	case OIDIfInBroadcastPkts:
+		if val, ok := value.(uint); ok {
+			ifaceDetails.OutBroadcastPkts = val
+		} else {
+			log.Printf("Value for OID %s is not of type uint: %T -> %v\n", oid, value, value)
+		}
+	case OIDIfCounterDiscontinuityTime:
+		if val, ok := value.(uint32); ok {
+			ifaceDetails.CounterDiscontinuityTime = val
+		} else {
+			log.Printf("Value for OID %s is not of type uint32: %T -> %v\n", oid, value, value)
+		}
+	case OIDIfHCOutMulticastPkts:
+		if val, ok := value.(uint64); ok {
+			ifaceDetails.HCOutMulticastPkts = val
+		} else {
+			log.Printf("Value for OID %s is not of type uint64: %T -> %v\n", oid, value, value)
+		}
+	case OIDIfInMulticastPkts:
+		if val, ok := value.(uint); ok {
+			ifaceDetails.InMulticastPkts = val
+		} else {
+			log.Printf("Value for OID %s is not of type uint: %T -> %v\n", oid, value, value)
+		}
+	case OIDIfOutMulticastPkts:
+		if val, ok := value.(uint); ok {
+			ifaceDetails.OutMulticastPkts = val
+		} else {
+			log.Printf("Value for OID %s is not of type uint: %T -> %v\n", oid, value, value)
+		}
+	case OIDIfPromiscuousMode:
+		if val, ok := value.(int); ok {
+			ifaceDetails.PromiscuousMode = val
+		} else {
+			log.Printf("Value for OID %s is not of type int: %T -> %v\n", oid, value, value)
+		}
+	default:
+		log.Printf("Unknown Type: OID: %s - %T -> %v\n", oid, value, value)
+	}
+}
+
+func buildInterfaceDetailsMessage(interfaces map[int]*InterfaceDetail) string {
+	var message strings.Builder
+	for index, iface := range interfaces {
+		message.WriteString(iface.renderToString(index))
+	}
+	return message.String()
+}
+
+// CheckInterfaceMetrics retrieves interface details from the target SNMP device using the provided SNMP client.
+// It walks the IF-MIB::ifEntry and ifXTable OIDs to gather information about each interface.
+// The function populates an InterfaceDetail structure for each interface encountered and builds a message
+// with the interface details. If any error occurs during the SNMP request, it will set the result to Critical
+// and return the error message along with the check result. Otherwise, it sets the result to OK and returns
+// the interface details message along with the check result.
 func CheckInterfaceMetrics(snmpClient *snmp.Client) *gomonitor.CheckResult {
-	//baseOID := "1.3.6.1.2.1.2.2.1" // OID for IF-MIB::ifEntry (contains fields like ifDescr, ifType, ifSpeed, etc.)
 	baseOIDs := []string{"1.3.6.1.2.1.2.2", "1.3.6.1.2.1.31.1.1.1"} // IF-MIB::ifEntry and ifXTable OIDs
 
 	// Prepare data structure for holding interface details
@@ -91,230 +442,18 @@ func CheckInterfaceMetrics(snmpClient *snmp.Client) *gomonitor.CheckResult {
 			}
 
 			ifaceDetails := interfaces[index]
-
 			// Match on the complete OID, excluding the index
-			switch oidWithoutIndex {
-			case ".1.3.6.1.2.1.2.2.1.2":
-				if val, ok := value.([]byte); ok {
-					ifaceDetails.Description = string(val)
-				} else {
-					fmt.Printf("ifDescr was not of type string: %T -> %v\n", value, value)
-				}
-			case ".1.3.6.1.2.1.2.2.1.3":
-				if val, ok := value.(int); ok {
-					ifaceDetails.Type = val
-				} else {
-					fmt.Printf("ifType was not of type int: %T -> %v\n", value, value)
-				}
-			case ".1.3.6.1.2.1.2.2.1.1":
-				if val, ok := value.(int); ok {
-					ifaceDetails.Index = val
-				} else {
-					fmt.Printf("ifIndex was not of type int: %T -> %v\n", value, value)
-				}
-			case ".1.3.6.1.2.1.2.2.1.4":
-				if val, ok := value.(int); ok {
-					ifaceDetails.MTU = val
-				} else {
-					fmt.Printf("ifMTU was not of type int: %T -> %v\n", value, value)
-				}
-			case ".1.3.6.1.2.1.2.2.1.5":
-				if val, ok := value.(uint); ok {
-					ifaceDetails.Speed = val
-				} else {
-					fmt.Printf("ifSpeed was not of type uint: %T -> %v\n", value, value)
-				}
-			case ".1.3.6.1.2.1.2.2.1.13":
-				if val, ok := value.(uint); ok {
-					ifaceDetails.InDiscards = val
-				} else {
-					fmt.Printf("ifInDiscards was not of type uint: %T -> %v\n", value, value)
-				}
-			case ".1.3.6.1.2.1.2.2.1.15":
-				if val, ok := value.(uint); ok {
-					ifaceDetails.OutUcastPkts = val
-				} else {
-					fmt.Printf("ifOutUcastPkts was not of type uint: %T -> %v\n", value, value)
-				}
-			case ".1.3.6.1.2.1.2.2.1.19":
-				if val, ok := value.(uint); ok {
-					ifaceDetails.OutDiscards = val
-				} else {
-					fmt.Printf("ifOutDiscards was not of type uint: %T -> %v\n", value, value)
-				}
-			case ".1.3.6.1.2.1.2.2.1.7":
-				if val, ok := value.(int); ok {
-					ifaceDetails.AdminStatus = val
-				} else {
-					fmt.Printf("ifAdminStatus was not of type int: %T -> %v\n", value, value)
-				}
-			case ".1.3.6.1.2.1.2.2.1.8":
-				if val, ok := value.(int); ok {
-					ifaceDetails.OperStatus = val
-				} else {
-					fmt.Printf("ifOperStatus was not of type int: %T -> %v\n", value, value)
-				}
-			case ".1.3.6.1.2.1.2.2.1.9":
-				if val, ok := value.(uint32); ok {
-					ifaceDetails.LastChange = val
-				} else {
-					fmt.Printf("ifLastChange was not of type uint32: %T -> %v\n", value, value)
-				}
-			case ".1.3.6.1.2.1.2.2.1.10":
-				if val, ok := value.(uint); ok {
-					ifaceDetails.InOctets = val
-				} else {
-					fmt.Printf("ifInOctets was not of type uint64: %T -> %v\n", value, value)
-				}
-			case ".1.3.6.1.2.1.2.2.1.16":
-				if val, ok := value.(uint); ok {
-					ifaceDetails.OutOctets = val
-				} else {
-					fmt.Printf("ifOutOctets was not of type uint64: %T -> %v\n", value, value)
-				}
-			case ".1.3.6.1.2.1.2.2.1.14":
-				if val, ok := value.(uint); ok {
-					ifaceDetails.InErrors = val
-				} else {
-					fmt.Printf("ifInErrors was not of type uint64: %T -> %v\n", value, value)
-				}
-			case ".1.3.6.1.2.1.2.2.1.20":
-				if val, ok := value.(uint); ok {
-					ifaceDetails.OutErrors = val
-				} else {
-					fmt.Printf("ifOutErrors was not of type uint64: %T -> %v\n", value, value)
-				}
-			case ".1.3.6.1.2.1.2.2.1.11":
-				if val, ok := value.(uint); ok {
-					ifaceDetails.InUcastPkts = val
-				} else {
-					fmt.Printf("ifInUcastPkts was not of type uint64: %T -> %v\n", value, value)
-				}
-			case ".1.3.6.1.2.1.2.2.1.17":
-				if val, ok := value.(uint); ok {
-					ifaceDetails.OutUcastPkts = val
-				} else {
-					fmt.Printf("ifOutUcastPkts was not of type uint64: %T -> %v\n", value, value)
-				}
-			case ".1.3.6.1.2.1.2.2.1.6":
-				if val, ok := value.([]byte); ok {
-					ifaceDetails.PhysAddress = hex.EncodeToString(val)
-				} else {
-					fmt.Printf("ifPhysAddress was not of type []byte: %T -> %v\n", value, value)
-				}
-			case ".1.3.6.1.2.1.31.1.1.1.1":
-				if val, ok := value.([]byte); ok {
-					ifaceDetails.Name = string(val)
-				} else {
-					fmt.Printf("ifName was not of type []byte: %T -> %v\n", value, value)
-				}
-			case ".1.3.6.1.2.1.31.1.1.1.18":
-				if val, ok := value.([]byte); ok {
-					ifaceDetails.Alias = string(val)
-				} else {
-					fmt.Printf("ifAlias was not of type []byte: %T -> %v\n", value, value)
-				}
-			case ".1.3.6.1.2.1.31.1.1.1.6":
-				if val, ok := value.(uint64); ok {
-					ifaceDetails.HCInOctets = val
-				} else {
-					fmt.Printf("HCInOctets was not of type uint64: %T -> %v\n", value, value)
-				}
-			case ".1.3.6.1.2.1.31.1.1.1.10":
-				if val, ok := value.(uint64); ok {
-					ifaceDetails.HCOutOctets = val
-				} else {
-					fmt.Printf("HCOutOctets was not of type uint64: %T -> %v\n", value, value)
-				}
-			case ".1.3.6.1.2.1.31.1.1.1.13":
-				if val, ok := value.(uint64); ok {
-					ifaceDetails.HCInUcastPkts = val
-				} else {
-					fmt.Printf("ifHCInUcastPkts was not of type uint64: %T -> %v\n", value, value)
-				}
-			case ".1.3.6.1.2.1.31.1.1.1.11":
-				if val, ok := value.(uint64); ok {
-					ifaceDetails.HCOutUcastPkts = val
-				} else {
-					fmt.Printf("ifHCOutUcastPkts was not of type uint64: %T -> %v\n", value, value)
-				}
-			case ".1.3.6.1.2.1.31.1.1.1.15":
-				if val, ok := value.(uint); ok {
-					ifaceDetails.HighSpeed = val
-				} else {
-					fmt.Printf("ifHighSpeed was not of type uint: %T -> %v\n", value, value)
-				}
-				/*default: //Should be things we don't care about.  TODO: I might make this part of a debug
-				fmt.Printf("Unknown Type: OID: %s - %T -> %v\n", oid, value, value)*/
-			}
+			updateInterfaceDetails(ifaceDetails, oidWithoutIndex, value)
 		}
 	}
 
-	message := ""
-	for index, iface := range interfaces {
-		message += fmt.Sprintf("Interface index: %d\nDescription: %s\nAlias: %s\nName: %s\nType: %d\nSpeed: %d\nOperStatus: %d\nAdminStatus: %d\nInOctets: %d\nOutOctets: %d\nHCInOctets: %d\nHCOutOctets: %d\nHCInUcastPkts: %d\nHCOutUcastPkts: %d\nInErrors: %d\nOutErrors: %d\nInUcastPkts: %d\nOutUcastPkts: %d\nInNUcastPkts: %d\nOutNUcastPkts: %d\nLastChange: %d\nPhysAddress: %s\n\n",
-			index,
-			iface.Description,
-			iface.Alias,
-			iface.Name,
-			iface.Type,
-			iface.Speed,
-			iface.OperStatus,
-			iface.AdminStatus,
-			iface.InOctets,
-			iface.OutOctets,
-			iface.HCInOctets,
-			iface.HCOutOctets,
-			iface.HCInUcastPkts,
-			iface.HCOutUcastPkts,
-			iface.InErrors,
-			iface.OutErrors,
-			iface.InUcastPkts,
-			iface.OutUcastPkts,
-			iface.InNUcastPkts,
-			iface.OutNUcastPkts,
-			iface.LastChange,
-			iface.PhysAddress)
-	}
+	message := buildInterfaceDetailsMessage(interfaces)
 	checkResult.SetResult(gomonitor.OK, message)
-	return checkResult
-}
-
-func CheckSysDescr(snmpClient *snmp.Client, expectedSysDescrRegExp string, enablePerfData bool) *gomonitor.CheckResult {
-	oids := []string{"1.3.6.1.2.1.1.1.0"}
-
-	result, latency, err := snmpClient.GetValue(oids)
-	if err != nil {
-		checkResult := gomonitor.NewCheckResult()
-		eMessage := fmt.Sprintf("SNMP target %s failed to return data for requested OID.", snmpClient.Target)
-		checkResult.SetResult(gomonitor.Critical, eMessage)
-		return checkResult
-	}
-
-	checkResult := gomonitor.NewCheckResult()
-	sysDescr := string(result.Variables[0].Value.([]uint8))
-
-	// Compare result with expected sysDescr using regexp
-	if expectedSysDescrRegExp != "" {
-		match, err := regexp.MatchString(expectedSysDescrRegExp, sysDescr)
-		if err != nil || !match {
-			eMessage := fmt.Sprintf("sysDescr does not match expected pattern '%s'. Got: %s", expectedSysDescrRegExp, sysDescr)
-			checkResult.SetResult(gomonitor.Critical, eMessage)
-			return checkResult
-		}
-	}
-	message := fmt.Sprintf("%s", sysDescr)
-	checkResult.SetResult(gomonitor.OK, message)
-
-	if enablePerfData {
-		// If performance data is enabled, add SNMP latency to the check result
-		checkResult.AddPerformanceData("latency", gomonitor.PerformanceMetric{Value: latency.Seconds(), UnitOM: "seconds"})
-	}
 	return checkResult
 }
 
 // main is the entry point of the program. It parses command-line flags, creates an SNMP client,
-// and performs a check on the target SNMP device using the CheckSysDescr function.
+// and performs a check on the target SNMP device using the CheckInterfaceMetrics function.
 // The result of the check is then sent using the SendResult method.
 func main() {
 	target := flag.String("target", "127.0.0.1", "The target SNMP device.")
