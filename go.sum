@@ -1,9 +1,7 @@
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
-github.com/dmabry/gomonitor v0.0.3 h1:D15kkasgV5NeCd3cM3y5zyD2PLBc07YIAvuZpMKZXw4=
-github.com/dmabry/gomonitor v0.0.3/go.mod h1:MQnmtcAaE4ttDWhJOUy+VrGSIy66oWnQ8V6FOphST4c=
-github.com/dmabry/gomonitor v0.0.4 h1:cWhQnVe1cRxT3ZhHSXUqQwD43JnLzbWcpf6NF5FsIy8=
-github.com/dmabry/gomonitor v0.0.4/go.mod h1:MQnmtcAaE4ttDWhJOUy+VrGSIy66oWnQ8V6FOphST4c=
+github.com/dmabry/gomonitor v0.0.5 h1:7j+sp49e1St+nYMzi2Mx+1neR5LYyl4da0PhoetjeYw=
+github.com/dmabry/gomonitor v0.0.5/go.mod h1:MQnmtcAaE4ttDWhJOUy+VrGSIy66oWnQ8V6FOphST4c=
 github.com/gosnmp/gosnmp v1.37.0 h1:/Tf8D3b9wrnNuf/SfbvO+44mPrjVphBhRtcGg22V07Y=
 github.com/gosnmp/gosnmp v1.37.0/go.mod h1:GDH9vNqpsD7f2HvZhKs5dlqSEcAS6s6Qp099oZRCR+M=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=
