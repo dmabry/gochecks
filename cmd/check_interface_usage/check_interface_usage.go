@@ -71,8 +71,13 @@ func GetInterfaceMetrics(snmpClient *snmp.Client, index int) (*InterfaceMetrics,
 
 	result, latency, err := snmpClient.GetValue(usageOIDs)
 	if err != nil {
-		eMessage := fmt.Sprintf("SNMP target %s failed to return data for requested OID: %w", snmpClient.Target, err)
+		eMessage := fmt.Sprintf("Requested OID: %s", err)
 		return nil, fmt.Errorf("%s: %w", eMessage, err)
+	}
+
+	if result.Variables[0].Value == nil {
+		eMessage := fmt.Sprintf("Index doesn't exist?")
+		return nil, fmt.Errorf("%s", eMessage)
 	}
 
 	metrics := &InterfaceMetrics{
@@ -110,16 +115,20 @@ func DetermineInterfaceUsage(first InterfaceMetrics, second InterfaceMetrics, wa
 	message := fmt.Sprintf("%s - In: %d %s Out: %d %s HCIn: %d %s HCOut: %d %s", intName, intIn, intInUnit, intOut, intOutUnit, intHCIn, intHCInUnit, intHCOut, intHCOutUnit)
 	if enablePerf {
 		checkResult.AddPerformanceData("snmp_latency", gomonitor.PerformanceMetric{Value: avgLatency.Seconds(), UnitOM: "s"})
-		checkResult.AddPerformanceData("in", gomonitor.PerformanceMetric{Value: float64(in * 8), Warn: float64(warnIn), Crit: float64(critIn), UnitOM: "bps"})
-		checkResult.AddPerformanceData("out", gomonitor.PerformanceMetric{Value: float64(out * 8), Warn: float64(warnOut), Crit: float64(critOut), UnitOM: "bps"})
-		checkResult.AddPerformanceData("hc_in", gomonitor.PerformanceMetric{Value: float64(hcIn * 8), Warn: float64(warnIn), Crit: float64(critIn), UnitOM: "bps"})
-		checkResult.AddPerformanceData("hc_out", gomonitor.PerformanceMetric{Value: float64(hcOut * 8), Warn: float64(warnOut), Crit: float64(critOut), UnitOM: "bps"})
+		checkResult.AddPerformanceData("in", gomonitor.PerformanceMetric{Value: float64(in * 8), Warn: float64(warnIn), Crit: float64(critIn), Min: 0, Max: float64(first.Speed), UnitOM: "bps"})
+		checkResult.AddPerformanceData("out", gomonitor.PerformanceMetric{Value: float64(out * 8), Warn: float64(warnOut), Crit: float64(critOut), Min: 0, Max: float64(first.Speed), UnitOM: "bps"})
+		checkResult.AddPerformanceData("hc_in", gomonitor.PerformanceMetric{Value: float64(hcIn * 8), Warn: float64(warnIn), Crit: float64(critIn), Min: 0, Max: float64(first.Speed), UnitOM: "bps"})
+		checkResult.AddPerformanceData("hc_out", gomonitor.PerformanceMetric{Value: float64(hcOut * 8), Warn: float64(warnOut), Crit: float64(critOut), Min: 0, Max: float64(first.Speed), UnitOM: "bps"})
 	}
 
 	if intIn > uint64(critIn) || intHCIn > uint64(critIn) {
-		checkResult.SetResult(gomonitor.Critical, message)
+		checkResult.SetResult(gomonitor.Critical, "Inbound exceeds threshold "+message)
 	} else if intIn > uint64(warnIn) || intHCIn > uint64(warnIn) {
-		checkResult.SetResult(gomonitor.Warning, message)
+		checkResult.SetResult(gomonitor.Warning, "Inbound exceeds threshold "+message)
+	} else if intOut > uint64(critOut) || intHCOut > uint64(critOut) {
+		checkResult.SetResult(gomonitor.Critical, "Outbound exceeds threshold "+message)
+	} else if intOut > uint64(warnOut) || intHCOut > uint64(warnOut) {
+		checkResult.SetResult(gomonitor.Warning, "Outbound exceeds threshold "+message)
 	} else {
 		checkResult.SetResult(gomonitor.OK, message)
 	}
@@ -146,7 +155,7 @@ func main() {
 	measure1, err1 := GetInterfaceMetrics(&snmpClient, *index)
 	if err1 != nil {
 		checkResult := gomonitor.NewCheckResult()
-		eMessage := fmt.Sprintf("SNMP target %s failed to return data when measuring metrics.", snmpClient.Target)
+		eMessage := fmt.Sprintf("SNMP target %s failed to return data when measuring metrics. %s", snmpClient.Target, err1)
 		checkResult.SetResult(gomonitor.Critical, eMessage)
 		checkResult.SendResult()
 	}
@@ -157,7 +166,7 @@ func main() {
 	measure2, err2 := GetInterfaceMetrics(&snmpClient, *index)
 	if err2 != nil {
 		checkResult := gomonitor.NewCheckResult()
-		eMessage := fmt.Sprintf("SNMP target %s failed to return data when measuring metrics.", snmpClient.Target)
+		eMessage := fmt.Sprintf("SNMP target %s failed to return data when measuring metrics. %s", snmpClient.Target, err2)
 		checkResult.SetResult(gomonitor.Critical, eMessage)
 		checkResult.SendResult()
 	}
