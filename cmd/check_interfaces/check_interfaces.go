@@ -28,6 +28,36 @@ import (
 	"strings"
 )
 
+// updateInterfaceDetails updates the corresponding field in ifaceDetails based on the provided OID and value.
+// It logs an error message if the value is not of the expected type for the specified OID.
+// Supported OIDs and their expected value types:
+// - interfaces.OIDIfIndex: int
+// - interfaces.OIDIfDescr: []byte
+// - interfaces.OIDIfType: int
+// - interfaces.OIDIfMTU: int
+// - interfaces.OIDIfSpeed: uint
+// - interfaces.OIDIfHighSpeed: uint
+// - interfaces.OIDIfPhysAddress: []byte
+// - interfaces.OIDIfAdminStatus: int
+// - interfaces.OIDIfOperStatus: int
+// - interfaces.OIDIfLastChange: uint32
+// - interfaces.OIDIfInOctets: uint
+// - interfaces.OIDIfInUcastPkts: uint
+// - interfaces.OIDIfInDiscards: uint
+// - interfaces.OIDIfInErrors: uint
+// - interfaces.OIDIfOutOctets: uint
+// - interfaces.OIDIfOutUcastPkts: uint
+// - interfaces.OIDIfOutDiscards: uint
+// - interfaces.OIDIfOutErrors: uint
+// - interfaces.OIDIfOutNUcastPkts: uint
+// - interfaces.OIDIfName: []byte
+// - interfaces.OIDIfAlias: []byte
+// - interfaces.OIDIfHCInOctets: uint64
+// - interfaces.OIDIfHCOutOctets: uint64
+// - interfaces.OIDIfHCInUcastPkts: uint64
+// - interfaces.OIDIfHCOutUcastPkts: uint64
+// - interfaces.OIDIfHCInMulticastPkts: uint64
+// - interfaces.OIDIfHCInBroadcastPkts: uint64
 func updateInterfaceDetails(ifaceDetails *interfaces.InterfaceDetail, oid string, value interface{}) {
 	switch oid {
 	case interfaces.OIDIfIndex:
@@ -257,6 +287,22 @@ func updateInterfaceDetails(ifaceDetails *interfaces.InterfaceDetail, oid string
 	}
 }
 
+// buildInterfaceDetailsMessage builds a message string containing the interface details
+// for each interface in the map of InterfaceDetail structures.
+//
+// Parameters:
+//   - interfaces: A map representing the interface details, where the key is the index of the interface
+//     and the value is a pointer to an InterfaceDetail structure.
+//
+// Returns:
+//   - message: A string representation of the interface details, where each interface is represented
+//     with its index and its corresponding InterfaceDetail structure converted to a string.
+//
+// Usage Example:
+//
+//	deviceInterfaces := make(map[int]*interfaces.InterfaceDetail)
+//	// Fill the deviceInterfaces map with interface details...
+//	message := buildInterfaceDetailsMessage(deviceInterfaces)
 func buildInterfaceDetailsMessage(interfaces map[int]*interfaces.InterfaceDetail) string {
 	var message strings.Builder
 	for index, iface := range interfaces {

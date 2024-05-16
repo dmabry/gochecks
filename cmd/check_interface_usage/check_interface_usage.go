@@ -26,6 +26,7 @@ import (
 	"time"
 )
 
+// InterfaceMetrics represents the metrics of a network interface.
 type InterfaceMetrics struct {
 	Name      string
 	In        uint
@@ -38,6 +39,16 @@ type InterfaceMetrics struct {
 	Timestamp time.Time
 }
 
+// convertToScale converts a given value to the appropriate scale (bps, Kbps, Mbps, or Gbps).
+// The function takes an input value in bits per second (bps) and returns the converted value
+// along with the corresponding unit of measurement.
+//
+// Parameters:
+//   - value: The input value in bits per second (bps) to be converted.
+//
+// Returns:
+//   - out: The converted value in the appropriate scale (bps, Kbps, Mbps, or Gbps).
+//   - unit: The corresponding unit of measurement for the converted value.
 func convertToScale(value uint64) (out uint64, unit string) {
 	bps := value * 8
 	if bps < 1000 {
@@ -58,6 +69,16 @@ func convertToScale(value uint64) (out uint64, unit string) {
 	return gbps, "Gbps"
 }
 
+// GetInterfaceMetrics retrieves the network interface metrics for a specific interface
+// using the provided SNMP client and index.
+//
+// Parameters:
+//   - snmpClient: The SNMP client used to connect and retrieve the metrics.
+//   - index: The index of the interface to retrieve the metrics for.
+//
+// Returns:
+//   - metrics: The network interface metrics for the specified interface.
+//   - error: Any error encountered during the retrieval of the metrics.
 func GetInterfaceMetrics(snmpClient *snmp.Client, index int) (*InterfaceMetrics, error) {
 	strIndex := strconv.Itoa(index)
 	oidName := fmt.Sprintf("%s.%s", interfaces.OIDIfName, strIndex)
@@ -95,6 +116,29 @@ func GetInterfaceMetrics(snmpClient *snmp.Client, index int) (*InterfaceMetrics,
 	return metrics, nil
 }
 
+// DetermineInterfaceUsage calculates the usage of a network interface based on the provided InterfaceMetrics.
+// It compares the metrics between two time periods and determines if the inbound and outbound traffic exceeds
+// the given warning and critical thresholds. It also converts the traffic values to the appropriate scale (bps,
+// Kbps, Mbps, or Gbps) and crafts a message with the results.
+//
+// Parameters:
+//   - first: The InterfaceMetrics representing the metrics of the first time period.
+//   - second: The InterfaceMetrics representing the metrics of the second time period.
+//   - warnIn: The warning threshold for inbound traffic in bps.
+//   - warnOut: The warning threshold for outbound traffic in bps.
+//   - critIn: The critical threshold for inbound traffic in bps.
+//   - critOut: The critical threshold for outbound traffic in bps.
+//   - enablePerf: A boolean indicating whether to include performance data in the check result.
+//
+// Returns:
+//   - checkResult: A pointer to a gomonitor.CheckResult object that represents the result of the interface usage calculation.
+//
+// Example:
+//
+//	first := InterfaceMetrics{Name: "eth0", In: 100, Out: 200, HCIn: 300, HCOut: 400, Speed: 1000, Latency: 10 * time.Millisecond, Timestamp: time.Now()}
+//	second := InterfaceMetrics{Name: "eth0", In: 200, Out: 300, HCIn: 400, HCOut: 500, Speed: 1000, Latency: 20 * time.Millisecond, Timestamp: time.Now()}
+//	result := DetermineInterfaceUsage(first, second, 500, 500, 1000, 1000, true)
+//	result.SendResult()
 func DetermineInterfaceUsage(first InterfaceMetrics, second InterfaceMetrics, warnIn int, warnOut int, critIn int, critOut int, enablePerf bool) *gomonitor.CheckResult {
 	checkResult := gomonitor.NewCheckResult()
 	intName := first.Name
