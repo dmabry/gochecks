@@ -9,14 +9,16 @@ oses=(windows darwin linux)
 archs=(amd64 arm64)
 cmds=(check_interface_usage check_interfaces check_sysdescr)
 
-for os in ${oses[@]}
+for os in "${oses[@]}"
 do
-  for arch in ${archs[@]}
+  for arch in "${archs[@]}"
   do
-    for cmd in ${cmds[@]}
+    for cmd in "${cmds[@]}"
     do
-	echo "Building binary ${cmd}_${os}_${arch}_${tag}"
-        env GOOS=${os} GOARCH=${arch} go build -ldflags '-s -w' -a -o ../bin/${cmd}_${os}_${arch}_${tag} ../cmd/${cmd}
+	    echo "Building binary ${cmd}_${os}_${arch}_${tag}"
+      env GOOS="${os}" GOARCH="${arch}" go build -ldflags '-s -w' -a -o ./bin/"${cmd}"_"${os}"_"${arch}"_"${tag}" ./cmd/"${cmd}"
+      # Drop semver to imply latest release
+      cp ./bin/"${cmd}"_"${os}"_"${arch}"_"${tag}" ./bin/"${cmd}"_"${os}"_"${arch}"
     done
   done
 done

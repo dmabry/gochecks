@@ -1,0 +1,31 @@
+name: "gochecks"
+arch: "amd64"
+platform: "linux"
+version: ${SEMVER}
+version_schema: semver
+version_metadata: git
+section: "default"
+priority: "extra"
+provides:
+  - check_interfaces
+  - check_sysdescr
+  - check_interface_usage
+maintainer: "dmabry"
+description: |
+  Gochecks is a collection of monitoring checks compatible with Nagios/Icinga platforms
+vendor: "Mabry Solutions"
+homepage: "http://github.com/dmabry/gochecks/"
+license: "Apache License 2.0"
+contents:
+  - src: ./bin/check_interfaces_linux_amd64
+    dst: /usr/lib/nagios/plugins/check_interfaces
+    file_info:
+      mode: 0755
+  - src: ./bin/check_interface_usage_linux_amd64
+    dst: /usr/lib/nagios/plugins/check_interface_usage
+    file_info:
+      mode: 0755
+  - src: ./bin/check_sysdescr_linux_amd64
+    dst: /usr/lib/nagios/plugins/check_sysdescr
+    file_info:
+      mode: 0755
