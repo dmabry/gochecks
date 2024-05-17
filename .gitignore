@@ -17,7 +17,6 @@
 
 # Dependency directories (remove the comment below to include it)
 vendor/
-bin/
 # Ignore default recorded_flows dir
 recorded_flows/
 # Ignore all prod
