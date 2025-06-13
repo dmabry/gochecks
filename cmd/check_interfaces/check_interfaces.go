@@ -328,7 +328,7 @@ func CheckInterfaceMetrics(snmpClient *snmp.Client) *gomonitor.CheckResult {
 	for _, baseOID := range baseOIDs {
 		result, _, err := snmpClient.Walk(baseOID)
 		if err != nil {
-			eMessage := fmt.Sprintf("SNMP target %s failed to return data for requested OID: %w", snmpClient.Target, err)
+			eMessage := fmt.Sprintf("SNMP target %s failed to return data for requested OID: %v", snmpClient.Target, err)
 			checkResult.SetResult(gomonitor.Critical, eMessage)
 			return checkResult
 		}
@@ -337,7 +337,7 @@ func CheckInterfaceMetrics(snmpClient *snmp.Client) *gomonitor.CheckResult {
 			// The index for each interface
 			index, err2 := strconv.Atoi(fields[len(fields)-1])
 			if err2 != nil {
-				eMessage := fmt.Sprintf("failed to convert interface index to int: %w", err2)
+				eMessage := fmt.Sprintf("failed to convert interface index to int: %v", err2)
 				checkResult.SetResult(gomonitor.Critical, eMessage)
 				return checkResult
 			}
