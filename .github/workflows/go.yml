@@ -26,6 +26,7 @@ jobs:
       run: |
         go mod tidy
         go mod download
+        go install github.com/goreleaser/nfpm/v2@latest
 
     - name: Build multi-platform binaries
       run: ./scripts/build-multiplatform.sh test
