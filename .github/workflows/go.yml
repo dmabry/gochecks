@@ -26,7 +26,10 @@ jobs:
       run: |
         go mod tidy
         go mod download
-        go install github.com/goreleaser/nfpm/v2@latest
+
+    - name: Install nfpm
+      run: |
+        curl -sL https://github.com/goreleaser/nfpm/releases/download/v2.43.0/nfpm_2.43.0_linux_amd64.tar.gz | tar xz --strip-components=1 -C /usr/local/bin nfpm
 
     - name: Build multi-platform binaries
       run: ./scripts/build-multiplatform.sh test
