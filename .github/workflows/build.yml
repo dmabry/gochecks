@@ -1,17 +1,14 @@
 
-
-name: Lint
+name: Build
 
 on:
-  push:
-    branches: [ "main" ]
   pull_request:
     branches:
       - main
   workflow_dispatch:
 
 jobs:
-  lint:
+  build:
     runs-on: ubuntu-latest
 
     steps:
@@ -23,11 +20,15 @@ jobs:
       with:
         go-version-file: 'go.mod'
 
-    - name: Install golangci-lint
+    - name: Install dependencies
       run: |
-        curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.54.2
+        go mod tidy
+        go mod download
 
-    - name: Run linters
+    - name: Build all commands
       run: |
-        golangci-lint run ./...
+        chmod +x scripts/build-multiplatform.sh
+        ./scripts/build-multiplatform.sh test
 
+    - name: List built binaries
+      run: ls -la bin/
