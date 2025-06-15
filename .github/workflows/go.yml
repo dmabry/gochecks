@@ -36,8 +36,8 @@ jobs:
     - name: Build multi-platform binaries
       run: ./scripts/build-multiplatform.sh test
 
-    - name: Build packages
-      run: ./scripts/build-packages.sh test
+#    - name: Build packages
+#      run: ./scripts/build-packages.sh test
 
   test:
     name: Test
