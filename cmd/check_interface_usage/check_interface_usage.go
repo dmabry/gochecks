@@ -81,25 +81,20 @@ func convertToScale(value uint64) (out uint64, unit string) {
 //   - error: Any error encountered during the retrieval of the metrics.
 func GetInterfaceMetrics(snmpClient *snmp.Client, index int) (*InterfaceMetrics, error) {
 	strIndex := strconv.Itoa(index)
-	oidName := fmt.Sprintf("%s.%s", interfaces.OIDIfName, strIndex)
-	oidHCIn := fmt.Sprintf("%s.%s", interfaces.OIDIfHCInOctets, strIndex)
-	oidHCOut := fmt.Sprintf("%s.%s", interfaces.OIDIfHCOutOctets, strIndex)
-	oidIn := fmt.Sprintf("%s.%s", interfaces.OIDIfInOctets, strIndex)
-	oidOut := fmt.Sprintf("%s.%s", interfaces.OIDIfOutOctets, strIndex)
-	oidSpeed := fmt.Sprintf("%s.%s", interfaces.OIDIfSpeed, strIndex)
-	oidHighSpeed := fmt.Sprintf("%s.%s", interfaces.OIDIfHighSpeed, strIndex)
+	oidName := interfaces.OIDIfName + "." + strIndex
+	oidHCIn := interfaces.OIDIfHCInOctets + "." + strIndex
+	oidHCOut := interfaces.OIDIfHCOutOctets + "." + strIndex
+	oidIn := interfaces.OIDIfInOctets + "." + strIndex
+	oidOut := interfaces.OIDIfOutOctets + "." + strIndex
+	oidSpeed := interfaces.OIDIfSpeed + "." + strIndex
+	oidHighSpeed := interfaces.OIDIfHighSpeed + "." + strIndex
 	usageOIDs := []string{oidName, oidIn, oidOut, oidHCIn, oidHCOut, oidSpeed, oidHighSpeed}
 
 	result, latency, err := snmpClient.GetValue(usageOIDs)
-	if err != nil {
-		eMessage := fmt.Sprintf("Requested OID: %s", err)
-		return nil, fmt.Errorf("%s: %w", eMessage, err)
-	}
-
-	if result.Variables[0].Value == nil {
-		eMessage := fmt.Sprintf("Index doesn't exist?")
-		return nil, fmt.Errorf("%s", eMessage)
-	}
+        if err != nil {
+            eMessage := "Requested OID: " + err.Error()
+            return nil, fmt.Errorf("%s: %w", eMessage, err)
+        }
 
 	metrics := &InterfaceMetrics{
 		Name:      string(result.Variables[0].Value.([]uint8)),
