@@ -70,7 +70,7 @@ func CheckSysDescr(snmpClient *snmp.Client, expectedSysDescrRegExp string, enabl
 			return checkResult
 		}
 	}
-	message := fmt.Sprintf("%s", sysDescr)
+	message := sysDescr
 	checkResult.SetResult(gomonitor.OK, message)
 
 	if enablePerfData {

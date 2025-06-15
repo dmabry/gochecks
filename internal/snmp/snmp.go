@@ -18,6 +18,7 @@ package snmp
 
 import (
 	"github.com/gosnmp/gosnmp"
+	"log"
 	"time"
 )
 
@@ -71,7 +72,12 @@ func (s *Client) GetValue(oids []string) (*gosnmp.SnmpPacket, time.Duration, err
 	if err != nil {
 		return nil, 0, err
 	}
-	defer snmpClient.Conn.Close()
+	// Defer closing the connection after the operation is complete
+defer func() {
+	if closeErr := snmpClient.Conn.Close(); closeErr != nil {
+		log.Printf("Error closing SNMP connection: %v", closeErr)
+	}
+}()
 
 	start := time.Now()
 
@@ -93,7 +99,14 @@ func (s *Client) Walk(baseOid string) (map[string]interface{}, time.Duration, er
 	if err != nil {
 		return nil, 0, err
 	}
-	defer snmpClient.Conn.Close()
+
+	// Defer closing the connection after the operation is complete
+	defer func() {
+		if closeErr := snmpClient.Conn.Close(); closeErr != nil {
+			log.Printf("Error closing SNMP connection: %v", closeErr)
+		}
+	}()
+
 
 	start := time.Now()
 
