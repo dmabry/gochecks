@@ -1,0 +1,34 @@
+
+name: Build
+
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version-file: 'go.mod'
+
+    - name: Install dependencies
+      run: |
+        go mod tidy
+        go mod download
+
+    - name: Build all commands
+      run: |
+        chmod +x scripts/build-multiplatform.sh
+        ./scripts/build-multiplatform.sh test
+
+    - name: List built binaries
+      run: ls -la bin/
