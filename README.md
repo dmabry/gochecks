@@ -47,16 +47,28 @@ Pre-built binaries and packages are available in the `bin` and `build/package/re
 
 ## Usage
 
-Each check has its own set of command-line options. Here's an example usage of `check_interfaces`:
+Each check has its own set of command-line options. Here are some examples:
+
+**Check all interfaces:**
 
 ```bash
 ./cmd/check_interfaces/check_interfaces -target 192.168.1.1 -community public
+```
+
+**Filter by interface description pattern:**
+
+```bash
+./cmd/check_interfaces/check_interfaces -target 192.168.1.1 -community public -iface "GigabitEthernet"
 ```
 
 ### Common Options
 
 - `-target`: The IP address or hostname of the SNMP target device (default: "127.0.0.1")
 - `-community`: The SNMP community string (default: "public")
+
+### check_interfaces Specific Options
+
+- `-iface`: Filter interfaces by description pattern (optional). Only shows interfaces whose description matches this pattern.
 
 ## Contributing
 
