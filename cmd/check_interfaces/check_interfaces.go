@@ -1,3 +1,5 @@
+
+
 /*
    Copyright 2024 David Mabry
 
@@ -361,12 +363,47 @@ func CheckInterfaceMetrics(snmpClient *snmp.Client) *gomonitor.CheckResult {
 	return checkResult
 }
 
+// filterInterfacesByDescription filters the interface results by a specific interface description.
+// If no interfaces match the description, it returns a Critical result. Otherwise, it returns
+// an OK result with only the matching interfaces.
+func filterInterfacesByDescription(result *gomonitor.CheckResult, ifaceDesc string) *gomonitor.CheckResult {
+	// Create a new check result for filtered interfaces
+	filteredResult := gomonitor.NewCheckResult()
+
+	// Check if the original result is OK and has interface data
+	if result.ExitCode == gomonitor.OK {
+		message := result.Message
+		lines := strings.Split(message, "\n\n")
+
+		var filteredInterfaces []string
+
+		for _, line := range lines {
+			if strings.Contains(line, "Description: "+ifaceDesc) {
+				filteredInterfaces = append(filteredInterfaces, line)
+			}
+		}
+
+		if len(filteredInterfaces) > 0 {
+			filteredMessage := strings.Join(filteredInterfaces, "\n\n")
+			filteredResult.SetResult(gomonitor.OK, filteredMessage)
+		} else {
+			filteredResult.SetResult(gomonitor.Critical, fmt.Sprintf("No interfaces found with description: %s", ifaceDesc))
+		}
+	} else {
+		// If original result is not OK, return it as-is
+		filteredResult.SetResult(result.ExitCode, result.Message)
+	}
+
+	return filteredResult
+}
+
 // main is the entry point of the program. It parses command-line flags, creates an SNMP client,
 // and performs a check on the target SNMP device using the CheckInterfaceMetrics function.
 // The result of the check is then sent using the SendResult method.
 func main() {
 	target := flag.String("target", "127.0.0.1", "The target SNMP device.")
 	community := flag.String("community", "public", "The SNMP community string.")
+	ifaceDesc := flag.String("iface", "", "Filter interfaces by description (optional).")
 	// enablePerfData := flag.Bool("enablePerfData", false, "Enable performance data. Default is false.")
 	flag.Parse()
 
@@ -376,5 +413,11 @@ func main() {
 	}
 	result := CheckInterfaceMetrics(&snmpClient)
 
-	result.SendResult()
+	if *ifaceDesc != "" {
+		filteredResult := filterInterfacesByDescription(result, *ifaceDesc)
+		filteredResult.SendResult()
+	} else {
+		result.SendResult()
+	}
 }
+
