@@ -1,51 +1,49 @@
-
-
-
 package main
 
 import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"github.com/dmabry/gochecks/internal/snmp"
 	"log"
 	"strings"
+
+	"github.com/dmabry/gochecks/internal/snmp"
 )
 
 type InventoryResult struct {
-	SystemInfo      SystemInfo      `json:"system_info,omitempty"`
-	Interfaces      []Interface     `json:"interfaces,omitempty"`
-	IPAddresses     []IPAddress     `json:"ip_addresses,omitempty"`
+	SystemInfo       SystemInfo       `json:"system_info,omitempty"`
+	Interfaces       []Interface      `json:"interfaces,omitempty"`
+	IPAddresses      []IPAddress      `json:"ip_addresses,omitempty"`
 	PhysicalEntities []PhysicalEntity `json:"physical_entities,omitempty"`
-	CPU             *CPUMetrics     `json:"cpu,omitempty"`
-	Memory          *MemoryMetrics  `json:"memory,omitempty"`
+	CPU              *CPUMetrics      `json:"cpu,omitempty"`
+	Memory           *MemoryMetrics   `json:"memory,omitempty"`
 }
 
 type SystemInfo struct {
-	Description    string `json:"description,omitempty"`
-	ObjectID      string `json:"object_id,omitempty"`
-	UpTime        float64 `json:"uptime_seconds,omitempty"`
-	Contact       string `json:"contact,omitempty"`
-	Name          string `json:"name,omitempty"`
-	Location      string `json:"location,omitempty"`
+	Description string  `json:"description,omitempty"`
+	ObjectID    string  `json:"object_id,omitempty"`
+	UpTime      float64 `json:"uptime_seconds,omitempty"`
+	Contact     string  `json:"contact,omitempty"`
+	Name        string  `json:"name,omitempty"`
+	Location    string  `json:"location,omitempty"`
 }
 
 type Interface struct {
-	Index         int    `json:"index,omitempty"`
-	Description   string `json:"description,omitempty"`
-	Type          int    `json:"type,omitempty"`
-	MTU           int    `json:"mtu,omitempty"`
-	Speed         int64  `json:"speed_bps,omitempty"`
-	MACAddress    string `json:"mac_address,omitempty"`
-	AdminStatus   int    `json:"admin_status,omitempty"`
-	OperStatus    int    `json:"oper_status,omitempty"`
-	InOctets      int64  `json:"in_octets,omitempty"`
-	OutOctets     int64  `json:"out_octets,omitempty"`
+	Index       int    `json:"index,omitempty"`
+	Description string `json:"description,omitempty"`
+	Type        int    `json:"type,omitempty"`
+	MTU         int    `json:"mtu,omitempty"`
+	Speed       int64  `json:"speed_bps,omitempty"`
+	MACAddress  string `json:"mac_address,omitempty"`
+	AdminStatus int    `json:"admin_status,omitempty"`
+	OperStatus  int    `json:"oper_status,omitempty"`
+	InOctets    int64  `json:"in_octets,omitempty"`
+	OutOctets   int64  `json:"out_octets,omitempty"`
 }
 
 type IPAddress struct {
-	IP       string `json:"ip_address,omitempty"`
-	IfIndex  int    `json:"interface_index,omitempty"`
+	IP      string `json:"ip_address,omitempty"`
+	IfIndex int    `json:"interface_index,omitempty"`
 }
 
 type PhysicalEntity struct {
@@ -57,14 +55,14 @@ type PhysicalEntity struct {
 }
 
 type CPUMetrics struct {
-	User float64 `json:"user_percent,omitempty"`
+	User   float64 `json:"user_percent,omitempty"`
 	System float64 `json:"system_percent,omitempty"`
-	Idle float64 `json:"idle_percent,omitempty"`
+	Idle   float64 `json:"idle_percent,omitempty"`
 }
 
 type MemoryMetrics struct {
-	TotalSwap int64  `json:"total_swap_kb,omitempty"`
-	AvailSwap int64  `json:"avail_swap_kb,omitempty"`
+	TotalSwap int64 `json:"total_swap_kb,omitempty"`
+	AvailSwap int64 `json:"avail_swap_kb,omitempty"`
 }
 
 // CollectDeviceInventory collects comprehensive inventory information from an SNMP device
@@ -125,12 +123,12 @@ func collectSystemInfo(client *snmp.Client) (*SystemInfo, error) {
 	info := &SystemInfo{}
 
 	oids := []string{
-		"1.3.6.1.2.1.1.1.0",  // sysDescr
-		"1.3.6.1.2.1.1.2.0",  // sysObjectID
-		"1.3.6.1.2.1.1.3.0",  // sysUpTime (in timeticks)
-		"1.3.6.1.2.1.1.4.0",  // sysContact
-		"1.3.6.1.2.1.1.5.0",  // sysName
-		"1.3.6.1.2.1.1.6.0",  // sysLocation
+		"1.3.6.1.2.1.1.1.0", // sysDescr
+		"1.3.6.1.2.1.1.2.0", // sysObjectID
+		"1.3.6.1.2.1.1.3.0", // sysUpTime (in timeticks)
+		"1.3.6.1.2.1.1.4.0", // sysContact
+		"1.3.6.1.2.1.1.5.0", // sysName
+		"1.3.6.1.2.1.1.6.0", // sysLocation
 	}
 
 	result, _, err := client.GetValue(oids)
@@ -260,7 +258,9 @@ func collectInterfaces(client *snmp.Client) ([]Interface, error) {
 // parseInterfaceIndex extracts the interface index from an OID suffix
 func parseInterfaceIndex(suffix string) int {
 	index := 0
-	fmt.Sscanf(suffix, "%d", &index)
+	if _, err := fmt.Sscanf(suffix, "%d", &index); err != nil {
+		log.Printf("Warning: failed to parse interface index from %s: %v", suffix, err)
+	}
 	return index
 }
 
@@ -464,5 +464,3 @@ func outputJSON(result *InventoryResult) {
 
 	fmt.Println(string(jsonOutput))
 }
-
-
