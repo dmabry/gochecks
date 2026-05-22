@@ -132,7 +132,7 @@ func TestClientWithNonRetryableError(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	client.withRetry(ctx, op)
+	_, _ = client.withRetry(ctx, op)
 
 	if opCount > 1 {
 		t.Errorf("Non-retryable error caused %d attempts, want only 1", opCount)
@@ -160,7 +160,7 @@ func TestClientRetryLogic(t *testing.T) {
 
 			opCount := 0
 			ctx := context.Background()
-			client.withRetry(ctx, func() (interface{}, error) {
+			_, _ = client.withRetry(ctx, func() (interface{}, error) {
 				opCount++
 				if opCount == 1 && tt.retryEnabled {
 					return nil, errors.New("connection refused")
@@ -185,7 +185,7 @@ func TestContextCancellationDuringBackoff(t *testing.T) {
 	defer cancel()
 
 	opCount := 0
-	client.withRetry(ctx, func() (interface{}, error) {
+	_, _ = client.withRetry(ctx, func() (interface{}, error) {
 		opCount++
 		return nil, errors.New("connection refused")
 	})

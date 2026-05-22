@@ -17,6 +17,7 @@
 package main
 
 import (
+	"context"
 	"encoding/hex"
 	"flag"
 	"fmt"
@@ -326,7 +327,7 @@ func CheckInterfaceMetrics(snmpClient *snmp.Client) *gomonitor.CheckResult {
 	checkResult := gomonitor.NewCheckResult()
 
 	for _, baseOID := range baseOIDs {
-		result, _, err := snmpClient.Walk(nil, baseOID)
+		result, _, err := snmpClient.Walk(context.TODO(), baseOID)
 		if err != nil {
 			eMessage := fmt.Sprintf("SNMP target %s failed to return data for requested OID: %v", snmpClient.Target, err)
 			checkResult.SetResult(gomonitor.Critical, eMessage)

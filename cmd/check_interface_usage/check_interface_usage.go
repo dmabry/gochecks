@@ -17,6 +17,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"github.com/dmabry/gochecks/internal/interfaces"
@@ -90,7 +91,7 @@ func GetInterfaceMetrics(snmpClient *snmp.Client, index int) (*InterfaceMetrics,
 	oidHighSpeed := interfaces.OIDIfHighSpeed + "." + strIndex
 	usageOIDs := []string{oidName, oidIn, oidOut, oidHCIn, oidHCOut, oidSpeed, oidHighSpeed}
 
-	result, latency, err := snmpClient.GetValue(nil, usageOIDs)
+	result, latency, err := snmpClient.GetValue(context.TODO(), usageOIDs)
 	if err != nil {
 		eMessage := "Requested OID: " + err.Error()
 		return nil, fmt.Errorf("%s: %w", eMessage, err)

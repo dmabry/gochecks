@@ -85,8 +85,3 @@ func TestCheckInterfaceMetrics(t *testing.T) {
 func TestFilterInterfacesByDescription(t *testing.T) {
 	t.Skip("Requires gomonitor mock implementation")
 }
-
-type mockCheckResult struct {
-	ExitCode int
-	Message  string
-}

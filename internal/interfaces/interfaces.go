@@ -153,7 +153,7 @@ func (ifaceDetail *InterfaceDetail) SetField(oid OID, value interface{}) error {
 			for _, b := range val {
 				parts = append(parts, fmt.Sprintf("%02x", b))
 			}
-			ifaceDetail.PhysAddress = fmt.Sprintf("%s", fmt.Sprintf("%s:%s:%s:%s:%s:%s", parts[0], parts[1], parts[2], parts[3], parts[4], parts[5]))
+			ifaceDetail.PhysAddress = fmt.Sprintf("%s:%s:%s:%s:%s:%s", parts[0], parts[1], parts[2], parts[3], parts[4], parts[5])
 			return nil
 		}
 		return fmt.Errorf("OID %s requires []byte, got %T", oid, value)
