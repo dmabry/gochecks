@@ -1,0 +1,30 @@
+version: "2"
+
+run:
+  timeout: 5m
+
+linters:
+  enable:
+    - errcheck
+    - ineffassign
+    - noctx
+    - staticcheck
+    - unused
+
+formatters:
+  enable:
+    - gofmt
+
+issues:
+  exclude-rules:
+    - path: _test\.go
+      linters:
+        - deadcode
+        - flag
+        - funlen
+        - lll
+        - scopelint
+
+linters-settings:
+  errcheck:
+    exclude: "^(Error|Close|Stop|Create|New|RawResult|SendResult|SetResult)\\w*\\.?\\("

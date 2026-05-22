@@ -1,5 +1,3 @@
-
-
 /*
    Copyright 2024 David Mabry
 
@@ -19,6 +17,7 @@
 package main
 
 import (
+	"context"
 	"encoding/hex"
 	"flag"
 	"fmt"
@@ -60,7 +59,7 @@ import (
 // - interfaces.OIDIfHCOutUcastPkts: uint64
 // - interfaces.OIDIfHCInMulticastPkts: uint64
 // - interfaces.OIDIfHCInBroadcastPkts: uint64
-func updateInterfaceDetails(ifaceDetails *interfaces.InterfaceDetail, oid string, value interface{}) {
+func updateInterfaceDetails(ifaceDetails *interfaces.InterfaceDetail, oid interfaces.OID, value interface{}) {
 	switch oid {
 	case interfaces.OIDIfIndex:
 		if val, ok := value.(int); ok {
@@ -328,7 +327,7 @@ func CheckInterfaceMetrics(snmpClient *snmp.Client) *gomonitor.CheckResult {
 	checkResult := gomonitor.NewCheckResult()
 
 	for _, baseOID := range baseOIDs {
-		result, _, err := snmpClient.Walk(baseOID)
+		result, _, err := snmpClient.Walk(context.TODO(), baseOID)
 		if err != nil {
 			eMessage := fmt.Sprintf("SNMP target %s failed to return data for requested OID: %v", snmpClient.Target, err)
 			checkResult.SetResult(gomonitor.Critical, eMessage)
@@ -354,7 +353,7 @@ func CheckInterfaceMetrics(snmpClient *snmp.Client) *gomonitor.CheckResult {
 
 			ifaceDetails := deviceInterfaces[index]
 			// Match on the complete OID, excluding the index
-			updateInterfaceDetails(ifaceDetails, oidWithoutIndex, value)
+			updateInterfaceDetails(ifaceDetails, interfaces.OID(oidWithoutIndex), value)
 		}
 	}
 
@@ -420,4 +419,3 @@ func main() {
 		result.SendResult()
 	}
 }
-
