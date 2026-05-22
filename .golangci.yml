@@ -3,6 +3,20 @@ version: "2"
 run:
   timeout: 5m
 
+linters:
+  enable:
+    - errcheck
+    - golint
+    - ineffassign
+    - noctx
+    - staticcheck
+    - unused
+    - vet
+
+formatters:
+  enable:
+    - gofmt
+
 issues:
   exclude-rules:
     - path: _test\.go
@@ -12,17 +26,6 @@ issues:
         - funlen
         - lll
         - scopelint
-
-linters:
-  enable:
-    - errcheck
-    - gofmt
-    - golint
-    - ineffassign
-    - noctx
-    - staticcheck
-    - unused
-    - vet
 
 linters-settings:
   errcheck:
