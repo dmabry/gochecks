@@ -17,6 +17,7 @@
 package snmp
 
 import (
+	"context"
 	"testing"
 )
 
@@ -42,7 +43,7 @@ func TestClientConnect(t *testing.T) {
 				Target:    tt.target,
 				Community: tt.community,
 			}
-			err := client.Connect(nil)
+			err := client.Connect(context.TODO())
 			if (err != nil) != tt.wantError {
 				t.Errorf("Connect() error = %v, wantError %v", err, tt.wantError)
 			}
@@ -74,7 +75,7 @@ func TestClientGetValue(t *testing.T) {
 				Target:    tt.target,
 				Community: tt.community,
 			}
-			_, _, err := client.GetValue(nil, tt.oids)
+			_, _, err := client.GetValue(context.TODO(), tt.oids)
 			if (err != nil) != tt.wantError {
 				t.Errorf("GetValue() error = %v, wantError %v", err, tt.wantError)
 			}
@@ -108,7 +109,7 @@ func TestClientWalk(t *testing.T) {
 				Target:    tt.target,
 				Community: tt.community,
 			}
-			result, _, err := client.Walk(nil, tt.baseOID)
+			result, _, err := client.Walk(context.TODO(), tt.baseOID)
 			if (err != nil) != tt.wantError {
 				t.Errorf("Walk() error = %v, wantError %v", err, tt.wantError)
 				return

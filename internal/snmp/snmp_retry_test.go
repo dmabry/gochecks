@@ -109,7 +109,7 @@ func TestClientWithNilContext(t *testing.T) {
 		retryPolicy: RetryPolicy{Enabled: true, MaxRetries: 3},
 	}
 
-	_, _ = client.withRetry(nil, func() (interface{}, error) {
+	_, _ = client.withRetry(context.TODO(), func() (interface{}, error) {
 		return nil, errors.New("test error")
 	})
 }
