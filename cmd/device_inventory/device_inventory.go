@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -131,7 +132,7 @@ func collectSystemInfo(client *snmp.Client) (*SystemInfo, error) {
 		"1.3.6.1.2.1.1.6.0", // sysLocation
 	}
 
-	result, _, err := client.GetValue(nil, oids)
+	result, _, err := client.GetValue(context.TODO(), oids)
 	if err != nil {
 		return nil, err
 	}
@@ -172,7 +173,7 @@ func collectInterfaces(client *snmp.Client) ([]Interface, error) {
 
 	// Use Walk to get all interface information
 	baseOID := "1.3.6.1.2.1.2.2.1"
-	oidsMap, _, err := client.Walk(nil, baseOID)
+	oidsMap, _, err := client.Walk(context.TODO(), baseOID)
 	if err != nil {
 		return nil, err
 	}
@@ -271,7 +272,7 @@ func collectIPAddresses(client *snmp.Client) ([]IPAddress, error) {
 
 	// Use Walk to get IP address table
 	baseOID := "1.3.6.1.2.1.4.20.1"
-	oidsMap, _, err := client.Walk(nil, baseOID)
+	oidsMap, _, err := client.Walk(context.TODO(), baseOID)
 	if err != nil {
 		return nil, err
 	}
@@ -303,7 +304,7 @@ func collectPhysicalEntities(client *snmp.Client) ([]PhysicalEntity, error) {
 
 	// Use Walk to get physical entity table
 	baseOID := "1.3.6.1.2.1.47.1.1.1.1"
-	oidsMap, _, err := client.Walk(nil, baseOID)
+	oidsMap, _, err := client.Walk(context.TODO(), baseOID)
 	if err != nil {
 		return nil, err
 	}
@@ -355,7 +356,7 @@ func collectCPUMetrics(client *snmp.Client) (*CPUMetrics, error) {
 		"1.3.6.1.4.1.2021.11.52.0", // ssCpuRawIdle
 	}
 
-	result, _, err := client.GetValue(nil, oids)
+	result, _, err := client.GetValue(context.TODO(), oids)
 	if err != nil {
 		return nil, err
 	}
@@ -400,7 +401,7 @@ func collectMemoryMetrics(client *snmp.Client) (*MemoryMetrics, error) {
 		"1.3.6.1.4.1.2021.4.4.0", // memAvailSwap
 	}
 
-	result, _, err := client.GetValue(nil, oids)
+	result, _, err := client.GetValue(context.TODO(), oids)
 	if err != nil {
 		return nil, err
 	}
