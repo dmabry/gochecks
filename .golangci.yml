@@ -6,12 +6,10 @@ run:
 linters:
   enable:
     - errcheck
-    - golint
     - ineffassign
     - noctx
     - staticcheck
     - unused
-    - vet
 
 formatters:
   enable:
