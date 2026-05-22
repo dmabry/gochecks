@@ -50,7 +50,7 @@ import (
 func CheckSysDescr(snmpClient *snmp.Client, expectedSysDescrRegExp string, enablePerfData bool) *gomonitor.CheckResult {
 	oids := []string{"1.3.6.1.2.1.1.1.0"}
 
-	result, latency, err := snmpClient.GetValue(oids)
+	result, latency, err := snmpClient.GetValue(nil, oids)
 	if err != nil {
 		checkResult := gomonitor.NewCheckResult()
 		eMessage := fmt.Sprintf("SNMP target %s failed to return data for requested OID.", snmpClient.Target)
