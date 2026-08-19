@@ -40,6 +40,52 @@ type InterfaceMetrics struct {
 	Timestamp time.Time
 }
 
+type InterfaceStatus struct {
+	AdminStatus int
+	OperStatus  int
+}
+
+func (ifStatus *InterfaceStatus) IsInterfaceUp() bool {
+	// If AdminStatus or OperStatus is not 1, return false
+	if ifStatus.AdminStatus != 1 || ifStatus.OperStatus != 1 {
+		return false
+	}
+
+	// If both are 1, return true
+	return true
+}
+
+func GetInterfaceStatus(snmpClient *snmp.Client, index int) (*InterfaceStatus, error) {
+	strIndex := strconv.Itoa(index)
+	oidAdminStatus := fmt.Sprintf("%s.%s", interfaces.OIDIfAdminStatus, strIndex)
+	oidOperStatus := fmt.Sprintf("%s.%s", interfaces.OIDIfOperStatus, strIndex)
+
+	statusOIDs := []string{oidAdminStatus, oidOperStatus}
+
+	result, _, err := snmpClient.GetValue(context.TODO(), statusOIDs)
+	if err != nil {
+		return nil, fmt.Errorf("requested OID: %w", err)
+	}
+
+	if len(result.Variables) < 2 || result.Variables[0].Value == nil || result.Variables[1].Value == nil {
+		return nil, fmt.Errorf("interface index %d does not exist", index)
+	}
+
+	adminStatus, ok := result.Variables[0].Value.(int)
+	if !ok {
+		return nil, fmt.Errorf("unexpected type for adminStatus: %T", result.Variables[0].Value)
+	}
+	operStatus, ok := result.Variables[1].Value.(int)
+	if !ok {
+		return nil, fmt.Errorf("unexpected type for operStatus: %T", result.Variables[1].Value)
+	}
+
+	return &InterfaceStatus{
+		AdminStatus: adminStatus,
+		OperStatus:  operStatus,
+	}, nil
+}
+
 // convertToScale converts a given value to the appropriate scale (bps, Kbps, Mbps, or Gbps).
 // The function takes an input value in bits per second (bps) and returns the converted value
 // along with the corresponding unit of measurement.
@@ -190,6 +236,24 @@ func main() {
 	snmpClient := snmp.Client{
 		Target:    *target,
 		Community: *community,
+	}
+
+	// Determine Interface Status before proceeding
+	status, err := GetInterfaceStatus(&snmpClient, *index)
+	if err != nil {
+		checkResult := gomonitor.NewCheckResult()
+		eMessage := fmt.Sprintf("SNMP target %s failed to return data when getting interface status. %s", snmpClient.Target, err)
+		checkResult.SetResult(gomonitor.Critical, eMessage)
+		checkResult.SendResult()
+		return
+	}
+
+	if !status.IsInterfaceUp() {
+		checkResult := gomonitor.NewCheckResult()
+		eMessage := fmt.Sprintf("SNMP target %s interface %d is down (adminStatus=%d, operStatus=%d).", snmpClient.Target, *index, status.AdminStatus, status.OperStatus)
+		checkResult.SetResult(gomonitor.Critical, eMessage)
+		checkResult.SendResult()
+		return
 	}
 
 	measure1, err1 := GetInterfaceMetrics(&snmpClient, *index)
