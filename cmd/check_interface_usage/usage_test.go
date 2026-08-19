@@ -137,3 +137,32 @@ func TestGetInterfaceMetricsRequiresDevice(t *testing.T) {
 	client := &snmp.Client{Target: "127.0.0.1", Community: "public"}
 	_, _ = GetInterfaceMetrics(client, 1)
 }
+
+func TestIsInterfaceUp(t *testing.T) {
+	tests := []struct {
+		name        string
+		adminStatus int
+		operStatus  int
+		want        bool
+	}{
+		{name: "both up", adminStatus: 1, operStatus: 1, want: true},
+		{name: "admin down", adminStatus: 2, operStatus: 1, want: false},
+		{name: "oper down", adminStatus: 1, operStatus: 2, want: false},
+		{name: "both down", adminStatus: 2, operStatus: 2, want: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &InterfaceStatus{AdminStatus: tt.adminStatus, OperStatus: tt.operStatus}
+			if got := s.IsInterfaceUp(); got != tt.want {
+				t.Errorf("IsInterfaceUp() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestGetInterfaceStatusRequiresDevice(t *testing.T) {
+	t.Skip("This test requires a real SNMP device")
+	client := &snmp.Client{Target: "127.0.0.1", Community: "public"}
+	_, _ = GetInterfaceStatus(client, 1)
+}

@@ -55,6 +55,17 @@ func TestUpdateInterfaceDetails(t *testing.T) {
 	}
 }
 
+func TestUpdateInterfaceDetailsInBroadcastPkts(t *testing.T) {
+	iface := &interfaces.InterfaceDetail{}
+	updateInterfaceDetails(iface, interfaces.OIDIfInBroadcastPkts, uint(42))
+	if iface.InBroadcastPkts != 42 {
+		t.Errorf("InBroadcastPkts = %d, want 42", iface.InBroadcastPkts)
+	}
+	if iface.OutBroadcastPkts != 0 {
+		t.Errorf("OutBroadcastPkts = %d, want 0 (should not be set)", iface.OutBroadcastPkts)
+	}
+}
+
 func TestBuildInterfaceDetailsMessage(t *testing.T) {
 	tests := []struct {
 		name        string

@@ -249,7 +249,7 @@ func updateInterfaceDetails(ifaceDetails *interfaces.InterfaceDetail, oid interf
 		}
 	case interfaces.OIDIfInBroadcastPkts:
 		if val, ok := value.(uint); ok {
-			ifaceDetails.OutBroadcastPkts = val
+			ifaceDetails.InBroadcastPkts = val
 		} else {
 			log.Printf("Value for OID %s is not of type uint: %T -> %v\n", oid, value, value)
 		}
