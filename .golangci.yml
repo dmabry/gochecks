@@ -10,21 +10,19 @@ linters:
     - noctx
     - staticcheck
     - unused
+  settings:
+    errcheck:
+      exclude-functions:
+        - "github.com/dmabry/gomonitor.(*CheckResult).SendResult"
+        - "github.com/dmabry/gomonitor.(*CheckResult).SetResult"
+        - "github.com/dmabry/gomonitor.(*CheckResult).AddPerformanceData"
+  exclusions:
+    rules:
+      - path: _test\.go
+        linters:
+          - funlen
+          - lll
 
 formatters:
   enable:
     - gofmt
-
-issues:
-  exclude-rules:
-    - path: _test\.go
-      linters:
-        - deadcode
-        - flag
-        - funlen
-        - lll
-        - scopelint
-
-linters-settings:
-  errcheck:
-    exclude: "^(Error|Close|Stop|Create|New|RawResult|SendResult|SetResult)\\w*\\.?\\("
