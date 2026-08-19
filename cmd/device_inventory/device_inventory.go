@@ -192,13 +192,15 @@ func collectInterfaces(client *snmp.Client) ([]Interface, error) {
 			continue
 		}
 
+		oidWithoutIndex := strings.Join(fields[:len(fields)-1], ".")
+
 		if _, ok := interfaceDetails[index]; !ok {
 			interfaceDetails[index] = &Interface{Index: index}
 		}
 
 		iface := interfaceDetails[index]
 
-		switch oid {
+		switch oidWithoutIndex {
 		case "1.3.6.1.2.1.2.2.1.1": // ifIndex
 			if val, ok := value.(int); ok {
 				iface.Index = val
@@ -265,8 +267,6 @@ func parseInterfaceIndex(suffix string) int {
 	return index
 }
 
-var currentIfIndex int
-
 func collectIPAddresses(client *snmp.Client) ([]IPAddress, error) {
 	var ipAddresses []IPAddress
 
@@ -277,16 +277,27 @@ func collectIPAddresses(client *snmp.Client) ([]IPAddress, error) {
 		return nil, err
 	}
 
+	ifIndexByIP := make(map[string]int)
+
 	for oid, value := range oidsMap {
-		switch oid {
+		fields := strings.Split(oid, ".")
+		// ipAdEntIfIndex => ...1.1.<ip> ; ipAdEntAddr => ...1.2.<ip>
+		if len(fields) < 8 {
+			continue
+		}
+
+		ip := strings.Join(fields[len(fields)-4:], ".")
+		base := strings.Join(fields[:len(fields)-4], ".")
+
+		switch base {
 		case "1.3.6.1.2.1.4.20.1.1": // ipAdEntIfIndex
 			if val, ok := value.(int); ok {
-				currentIfIndex = val
+				ifIndexByIP[ip] = val
 			}
 		case "1.3.6.1.2.1.4.20.1.2": // ipAdEntAddr (IP address)
 			if val, ok := value.([]byte); ok && len(val) == 4 {
 				ipInfo := IPAddress{
-					IfIndex: currentIfIndex,
+					IfIndex: ifIndexByIP[ip],
 					IP:      fmt.Sprintf("%d.%d.%d.%d", val[0], val[1], val[2], val[3]),
 				}
 				ipAddresses = append(ipAddresses, ipInfo)
@@ -296,8 +307,6 @@ func collectIPAddresses(client *snmp.Client) ([]IPAddress, error) {
 
 	return ipAddresses, nil
 }
-
-var currentEntityIndex int
 
 func collectPhysicalEntities(client *snmp.Client) ([]PhysicalEntity, error) {
 	var entities []PhysicalEntity
@@ -309,38 +318,45 @@ func collectPhysicalEntities(client *snmp.Client) ([]PhysicalEntity, error) {
 		return nil, err
 	}
 
-	currentEntityIndex = 0
+	entityMap := make(map[int]*PhysicalEntity)
 
 	for oid, value := range oidsMap {
-		switch oid {
+		fields := strings.Split(oid, ".")
+		if len(fields) < 2 {
+			continue
+		}
+
+		index := parseInterfaceIndex(fields[len(fields)-1])
+		base := strings.Join(fields[:len(fields)-1], ".")
+
+		entity, ok := entityMap[index]
+		if !ok {
+			entity = &PhysicalEntity{Index: index}
+			entityMap[index] = entity
+		}
+
+		switch base {
 		case "1.3.6.1.2.1.47.1.1.1.1.2": // entPhysicalDescr
 			if val, ok := value.([]byte); ok {
-				currentEntityIndex++
-				currentEntity := PhysicalEntity{
-					Index:       currentEntityIndex,
-					Description: string(val),
-				}
-				entities = append(entities, currentEntity)
+				entity.Description = string(val)
 			}
 		case "1.3.6.1.2.1.47.1.1.1.1.3": // entPhysicalVendor
-			if len(entities) > 0 {
-				if val, ok := value.([]byte); ok {
-					entities[len(entities)-1].Vendor = string(val)
-				}
+			if val, ok := value.([]byte); ok {
+				entity.Vendor = string(val)
 			}
 		case "1.3.6.1.2.1.47.1.1.1.1.5": // entPhysicalModelName
-			if len(entities) > 0 {
-				if val, ok := value.([]byte); ok {
-					entities[len(entities)-1].ModelName = string(val)
-				}
+			if val, ok := value.([]byte); ok {
+				entity.ModelName = string(val)
 			}
 		case "1.3.6.1.2.1.47.1.1.1.1.11": // entPhysicalSerialNum
-			if len(entities) > 0 {
-				if val, ok := value.([]byte); ok {
-					entities[len(entities)-1].SerialNumber = string(val)
-				}
+			if val, ok := value.([]byte); ok {
+				entity.SerialNumber = string(val)
 			}
 		}
+	}
+
+	for _, entity := range entityMap {
+		entities = append(entities, *entity)
 	}
 
 	return entities, nil
