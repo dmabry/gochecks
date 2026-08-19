@@ -231,6 +231,7 @@ func main() {
 	critIn := flag.Int("critIn", 0, "Critical level for inbound in bps. Default is 0.")
 	warnOut := flag.Int("warnOut", 0, "Warning level for outbound in bps. Default is 0.")
 	critOut := flag.Int("critOut", 0, "Critical level for outbound bps. Default is 0.")
+	checkStatus := flag.Bool("checkStatus", true, "Check interface admin/oper status before measuring. Returns Critical if the interface is down.")
 	flag.Parse()
 
 	snmpClient := snmp.Client{
@@ -239,21 +240,23 @@ func main() {
 	}
 
 	// Determine Interface Status before proceeding
-	status, err := GetInterfaceStatus(&snmpClient, *index)
-	if err != nil {
-		checkResult := gomonitor.NewCheckResult()
-		eMessage := fmt.Sprintf("SNMP target %s failed to return data when getting interface status. %s", snmpClient.Target, err)
-		checkResult.SetResult(gomonitor.Critical, eMessage)
-		checkResult.SendResult()
-		return
-	}
+	if *checkStatus {
+		status, err := GetInterfaceStatus(&snmpClient, *index)
+		if err != nil {
+			checkResult := gomonitor.NewCheckResult()
+			eMessage := fmt.Sprintf("SNMP target %s failed to return data when getting interface status. %s", snmpClient.Target, err)
+			checkResult.SetResult(gomonitor.Critical, eMessage)
+			checkResult.SendResult()
+			return
+		}
 
-	if !status.IsInterfaceUp() {
-		checkResult := gomonitor.NewCheckResult()
-		eMessage := fmt.Sprintf("SNMP target %s interface %d is down (adminStatus=%d, operStatus=%d).", snmpClient.Target, *index, status.AdminStatus, status.OperStatus)
-		checkResult.SetResult(gomonitor.Critical, eMessage)
-		checkResult.SendResult()
-		return
+		if !status.IsInterfaceUp() {
+			checkResult := gomonitor.NewCheckResult()
+			eMessage := fmt.Sprintf("SNMP target %s interface %d is down (adminStatus=%d, operStatus=%d).", snmpClient.Target, *index, status.AdminStatus, status.OperStatus)
+			checkResult.SetResult(gomonitor.Critical, eMessage)
+			checkResult.SendResult()
+			return
+		}
 	}
 
 	measure1, err1 := GetInterfaceMetrics(&snmpClient, *index)
