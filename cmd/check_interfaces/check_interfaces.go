@@ -27,6 +27,8 @@ import (
 	"log"
 	"strconv"
 	"strings"
+
+	"github.com/gosnmp/gosnmp"
 )
 
 // updateInterfaceDetails updates the corresponding field in ifaceDetails based on the provided OID and value.
@@ -417,11 +419,23 @@ func main() {
 	community := flag.String("community", "public", "The SNMP community string.")
 	ifaceDesc := flag.String("iface", "", "Filter interfaces by description (optional).")
 	enablePerfData := flag.Bool("enablePerfData", false, "Enable performance data. Adds the interface count as a performance metric.")
+	snmpVersion := &snmp.SNMPVersionFlag{}
+	flag.Var(snmpVersion, "snmpVersion", "SNMP protocol version: 2c or 3 (default 2c).")
+	v3Username, v3AuthProtocol, v3AuthPassphrase, v3PrivProtocol, v3PrivPassphrase := snmp.AddV3Flags(flag.CommandLine)
 	flag.Parse()
 
 	snmpClient := snmp.Client{
 		Target:    *target,
 		Community: *community,
+		Version:   snmpVersion.Version,
+	}
+
+	if snmpVersion.Version == gosnmp.Version3 {
+		if err := snmp.ApplyV3Flags(&snmpClient, *v3Username, v3AuthProtocol.Protocol, *v3AuthPassphrase, v3PrivProtocol.Protocol, *v3PrivPassphrase); err != nil {
+			checkResult := gomonitor.NewCheckResult()
+			checkResult.SetResult(gomonitor.Unknown, err.Error())
+			checkResult.SendResult()
+		}
 	}
 	result := CheckInterfaceMetrics(&snmpClient)
 

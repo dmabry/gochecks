@@ -18,6 +18,7 @@ package snmp
 
 import (
 	"context"
+	"errors"
 	"os"
 	"strconv"
 	"strings"
@@ -40,22 +41,101 @@ type RetryPolicy struct {
 }
 
 // Client represents an SNMP client that allows connecting to a target SNMP device.
+// It supports SNMP v2c (community-based) and SNMP v3 (USM user-based).
 type Client struct {
-	Target      string
-	Community   string
-	snmpClient  *gosnmp.GoSNMP
-	retryPolicy RetryPolicy
+	Target    string
+	Community string
+	Version   gosnmp.SnmpVersion
+	// SNMP v3 USM settings (used when Version is gosnmp.Version3)
+	SecLevel       gosnmp.SnmpV3MsgFlags
+	SecName        string
+	AuthProtocol   gosnmp.SnmpV3AuthProtocol
+	AuthPassphrase string
+	PrivProtocol   gosnmp.SnmpV3PrivProtocol
+	PrivPassphrase string
+	snmpClient     *gosnmp.GoSNMP
+	retryPolicy    RetryPolicy
 }
 
 // ClientOption is a functional option for configuring an SNMP Client.
 type ClientOption func(*Client) error
 
+// DefaultSNMPVersion is the SNMP version used when no option overrides it.
+const DefaultSNMPVersion = gosnmp.Version2c
+
+// WithSNMPVersion sets the SNMP protocol version (v2c or v3).
+func WithSNMPVersion(v gosnmp.SnmpVersion) ClientOption {
+	return func(c *Client) error {
+		c.Version = v
+		return nil
+	}
+}
+
+// WithV3AuthNoPriv configures SNMP v3 with authentication but no privacy
+// (authNoPriv security level).
+func WithV3AuthNoPriv(username string, authProtocol gosnmp.SnmpV3AuthProtocol, authPassphrase string) ClientOption {
+	return func(c *Client) error {
+		if username == "" {
+			return errors.New("invalid option: v3 username must not be empty")
+		}
+		if authPassphrase == "" {
+			return errors.New("invalid option: v3 auth passphrase must not be empty")
+		}
+		c.Version = gosnmp.Version3
+		c.SecLevel = gosnmp.AuthNoPriv
+		c.SecName = username
+		c.AuthProtocol = authProtocol
+		c.AuthPassphrase = authPassphrase
+		return nil
+	}
+}
+
+// WithV3AuthPriv configures SNMP v3 with authentication and privacy
+// (authPriv security level).
+func WithV3AuthPriv(username string, authProtocol gosnmp.SnmpV3AuthProtocol, authPassphrase string, privProtocol gosnmp.SnmpV3PrivProtocol, privPassphrase string) ClientOption {
+	return func(c *Client) error {
+		if username == "" {
+			return errors.New("invalid option: v3 username must not be empty")
+		}
+		if authPassphrase == "" {
+			return errors.New("invalid option: v3 auth passphrase must not be empty")
+		}
+		if privPassphrase == "" {
+			return errors.New("invalid option: v3 priv passphrase must not be empty")
+		}
+		c.Version = gosnmp.Version3
+		c.SecLevel = gosnmp.AuthPriv
+		c.SecName = username
+		c.AuthProtocol = authProtocol
+		c.AuthPassphrase = authPassphrase
+		c.PrivProtocol = privProtocol
+		c.PrivPassphrase = privPassphrase
+		return nil
+	}
+}
+
+// WithV3NoAuthNoPriv configures SNMP v3 with no authentication and no privacy
+// (noAuthNoPriv security level).
+func WithV3NoAuthNoPriv(username string) ClientOption {
+	return func(c *Client) error {
+		if username == "" {
+			return errors.New("invalid option: v3 username must not be empty")
+		}
+		c.Version = gosnmp.Version3
+		c.SecLevel = gosnmp.NoAuthNoPriv
+		c.SecName = username
+		return nil
+	}
+}
+
 // NewClient creates a new SNMP client with the given target and community string,
-// applying any provided configuration options.
+// applying any provided configuration options. The default SNMP version is v2c;
+// use WithSNMPVersion or the WithV3* options to select v3.
 func NewClient(target, community string, opts ...ClientOption) (*Client, error) {
 	client := &Client{
 		Target:      target,
 		Community:   community,
+		Version:     DefaultSNMPVersion,
 		retryPolicy: retryPolicyFromEnv(),
 	}
 
@@ -189,14 +269,27 @@ func (c *Client) withRetry(ctx context.Context, op func() (interface{}, error)) 
 	return nil, lastErr
 }
 
-// createGoSNMP creates and connects a new gosnmp.GoSNMP instance.
+// createGoSNMP creates and connects a new gosnmp.GoSNMP instance configured
+// for the client's SNMP version: v2c (community) or v3 (USM security model).
 func (s *Client) createGoSNMP() (*gosnmp.GoSNMP, error) {
 	snmpClient := &gosnmp.GoSNMP{
 		Target:    s.Target,
 		Port:      161,
 		Community: s.Community,
-		Version:   gosnmp.Version2c,
+		Version:   s.Version,
 		Timeout:   timeout15,
+	}
+
+	if s.Version == gosnmp.Version3 {
+		snmpClient.SecurityModel = gosnmp.UserSecurityModel
+		snmpClient.MsgFlags = s.SecLevel
+		snmpClient.SecurityParameters = &gosnmp.UsmSecurityParameters{
+			UserName:                 s.SecName,
+			AuthenticationProtocol:   s.AuthProtocol,
+			AuthenticationPassphrase: s.AuthPassphrase,
+			PrivacyProtocol:          s.PrivProtocol,
+			PrivacyPassphrase:        s.PrivPassphrase,
+		}
 	}
 
 	if err := snmpClient.Connect(); err != nil {
