@@ -65,6 +65,23 @@ Each check has its own set of command-line options. Here are some examples:
 
 - `-target`: The IP address or hostname of the SNMP target device (default: "127.0.0.1")
 - `-community`: The SNMP community string (default: "public")
+- `-snmpVersion`: SNMP protocol version: `2c` or `3` (default: `2c`)
+
+### SNMP v3
+
+All checks support SNMP v3 (user-based security model). Passphrases are provided on the command line; the security level is derived from which passphrases are given:
+
+- `-v3Username` only → **noAuthNoPriv**
+- `-v3Username` + `-v3AuthPassphrase` → **authNoPriv** (auth protocol: `-v3AuthProtocol MD5|SHA`, default SHA)
+- `-v3Username` + `-v3AuthPassphrase` + `-v3PrivPassphrase` → **authPriv** (priv protocol: `-v3PrivProtocol DES|AES|AES192|AES256|AES192C|AES256C`, default AES)
+
+Example with authentication and privacy:
+
+```bash
+./cmd/check_interfaces/check_interfaces -target 192.168.1.1 -snmpVersion 3 \
+  -v3Username monitor -v3AuthProtocol SHA -v3AuthPassphrase ... \
+  -v3PrivProtocol AES256 -v3PrivPassphrase ...
+```
 
 ### check_interfaces Specific Options
 

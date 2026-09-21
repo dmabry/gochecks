@@ -23,6 +23,8 @@ import (
 	"github.com/dmabry/gochecks/internal/snmp"
 	"github.com/dmabry/gomonitor"
 	"regexp"
+
+	"github.com/gosnmp/gosnmp"
 )
 
 // CheckSysDescr checks the sysDescr value of an SNMP target using a regular expression pattern.
@@ -89,11 +91,24 @@ func main() {
 	community := flag.String("community", "public", "The SNMP community string.")
 	expectedSysDescrRegExp := flag.String("sysDescrPattern", "", "Regex pattern sysDescr to be matched. If not provided, any sysDescr will be accepted.")
 	enablePerfData := flag.Bool("enablePerfData", false, "Enable performance data. Default is false.")
+	snmpVersion := &snmp.SNMPVersionFlag{}
+	flag.Var(snmpVersion, "snmpVersion", "SNMP protocol version: 2c or 3 (default 2c).")
+	v3Username, v3AuthProtocol, v3AuthPassphrase, v3PrivProtocol, v3PrivPassphrase := snmp.AddV3Flags(flag.CommandLine)
 	flag.Parse()
 
 	snmpClient := snmp.Client{
 		Target:    *target,
 		Community: *community,
+		Version:   snmpVersion.Version,
+	}
+
+	if snmpVersion.Version == gosnmp.Version3 {
+		if err := snmp.ApplyV3Flags(&snmpClient, *v3Username, v3AuthProtocol.Protocol, *v3AuthPassphrase, v3PrivProtocol.Protocol, *v3PrivPassphrase); err != nil {
+			checkResult := gomonitor.NewCheckResult()
+			checkResult.SetResult(gomonitor.Unknown, err.Error())
+			checkResult.SendResult()
+			return
+		}
 	}
 	result := CheckSysDescr(&snmpClient, *expectedSysDescrRegExp, *enablePerfData)
 	result.SendResult()

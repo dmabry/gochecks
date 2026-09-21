@@ -25,6 +25,8 @@ import (
 	"github.com/dmabry/gomonitor"
 	"strconv"
 	"time"
+
+	"github.com/gosnmp/gosnmp"
 )
 
 // InterfaceMetrics represents the metrics of a network interface.
@@ -258,11 +260,24 @@ func main() {
 	warnOut := flag.Int("warnOut", 0, "Warning level for outbound in bps. Default is 0.")
 	critOut := flag.Int("critOut", 0, "Critical level for outbound bps. Default is 0.")
 	checkStatus := flag.Bool("checkStatus", true, "Check interface admin/oper status before measuring. Returns Critical if the interface is down.")
+	snmpVersion := &snmp.SNMPVersionFlag{}
+	flag.Var(snmpVersion, "snmpVersion", "SNMP protocol version: 2c or 3 (default 2c).")
+	v3Username, v3AuthProtocol, v3AuthPassphrase, v3PrivProtocol, v3PrivPassphrase := snmp.AddV3Flags(flag.CommandLine)
 	flag.Parse()
 
 	snmpClient := snmp.Client{
 		Target:    *target,
 		Community: *community,
+		Version:   snmpVersion.Version,
+	}
+
+	if snmpVersion.Version == gosnmp.Version3 {
+		if err := snmp.ApplyV3Flags(&snmpClient, *v3Username, v3AuthProtocol.Protocol, *v3AuthPassphrase, v3PrivProtocol.Protocol, *v3PrivPassphrase); err != nil {
+			checkResult := gomonitor.NewCheckResult()
+			checkResult.SetResult(gomonitor.Unknown, err.Error())
+			checkResult.SendResult()
+			return
+		}
 	}
 
 	// Determine Interface Status before proceeding

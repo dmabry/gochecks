@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/dmabry/gochecks/internal/snmp"
+	"github.com/gosnmp/gosnmp"
 )
 
 type InventoryResult struct {
@@ -451,11 +452,21 @@ func main() {
 	target := flag.String("target", "127.0.0.1", "The target SNMP device.")
 	community := flag.String("community", "public", "The SNMP community string.")
 	outputFormat := flag.String("output", "json", "Output format (currently only \"json\" is supported)")
+	snmpVersion := &snmp.SNMPVersionFlag{}
+	flag.Var(snmpVersion, "snmpVersion", "SNMP protocol version: 2c or 3 (default 2c).")
+	v3Username, v3AuthProtocol, v3AuthPassphrase, v3PrivProtocol, v3PrivPassphrase := snmp.AddV3Flags(flag.CommandLine)
 	flag.Parse()
 
 	snmpClient := snmp.Client{
 		Target:    *target,
 		Community: *community,
+		Version:   snmpVersion.Version,
+	}
+
+	if snmpVersion.Version == gosnmp.Version3 {
+		if err := snmp.ApplyV3Flags(&snmpClient, *v3Username, v3AuthProtocol.Protocol, *v3AuthPassphrase, v3PrivProtocol.Protocol, *v3PrivPassphrase); err != nil {
+			log.Fatalf("Invalid SNMP v3 configuration: %v", err)
+		}
 	}
 
 	result, err := CollectDeviceInventory(&snmpClient)
