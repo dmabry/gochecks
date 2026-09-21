@@ -4,5 +4,5 @@ go 1.26.6
 
 require (
 	github.com/dmabry/gomonitor v1.3.1
-	github.com/gosnmp/gosnmp v1.44.0
+	github.com/gosnmp/gosnmp v1.45.0
 )
