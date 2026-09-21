@@ -7,7 +7,7 @@
 
 oses=(windows darwin linux)
 archs=(amd64 arm64)
-cmds=(check_interface_usage check_interfaces check_sysdescr)
+cmds=(check_interface_usage check_interfaces check_sysdescr device_inventory)
 
 for os in "${oses[@]}"
 do

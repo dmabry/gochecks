@@ -10,6 +10,7 @@ provides:
   - check_interfaces
   - check_sysdescr
   - check_interface_usage
+  - device_inventory
 maintainer: "dmabry"
 description: |
   Gochecks is a collection of monitoring checks compatible with Nagios/Icinga platforms
@@ -27,5 +28,9 @@ contents:
       mode: 0755
   - src: ./bin/check_sysdescr_linux_amd64
     dst: /usr/lib/nagios/plugins/check_sysdescr
+    file_info:
+      mode: 0755
+  - src: ./bin/device_inventory_linux_amd64
+    dst: /usr/lib/nagios/plugins/device_inventory
     file_info:
       mode: 0755
