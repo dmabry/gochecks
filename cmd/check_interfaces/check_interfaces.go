@@ -362,6 +362,19 @@ func CheckInterfaceMetrics(snmpClient *snmp.Client) *gomonitor.CheckResult {
 	return checkResult
 }
 
+// countInterfaces counts the interfaces in a rendered interface-details
+// message (each interface block is separated by a blank line).
+func countInterfaces(message string) int {
+	lines := strings.Split(strings.TrimSpace(message), "\n\n")
+	count := 0
+	for _, line := range lines {
+		if strings.TrimSpace(line) != "" {
+			count++
+		}
+	}
+	return count
+}
+
 // filterInterfacesByDescription filters the interface results by a specific interface description.
 // If no interfaces match the description, it returns a Critical result. Otherwise, it returns
 // an OK result with only the matching interfaces.
@@ -403,7 +416,7 @@ func main() {
 	target := flag.String("target", "127.0.0.1", "The target SNMP device.")
 	community := flag.String("community", "public", "The SNMP community string.")
 	ifaceDesc := flag.String("iface", "", "Filter interfaces by description (optional).")
-	// enablePerfData := flag.Bool("enablePerfData", false, "Enable performance data. Default is false.")
+	enablePerfData := flag.Bool("enablePerfData", false, "Enable performance data. Adds the interface count as a performance metric.")
 	flag.Parse()
 
 	snmpClient := snmp.Client{
@@ -411,6 +424,11 @@ func main() {
 		Community: *community,
 	}
 	result := CheckInterfaceMetrics(&snmpClient)
+
+	if *enablePerfData {
+		ifaceCount := countInterfaces(result.Message)
+		result.AddPerformanceData("interfaces", gomonitor.PerformanceMetric{Value: float64(ifaceCount)})
+	}
 
 	if *ifaceDesc != "" {
 		filteredResult := filterInterfacesByDescription(result, *ifaceDesc)

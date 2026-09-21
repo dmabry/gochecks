@@ -19,7 +19,7 @@ gochecks currently includes the following checks:
 1. **check_interfaces**: Monitors interface metrics such as status, speed, traffic counters, etc.
 2. **check_interface_usage**: Monitors interface usage statistics and utilization
 3. **check_sysdescr**: Checks system description information from network devices
-4. **check_bgp_peers**: Monitors BGP peer relationships
+4. **device_inventory**: SNMP-based inventory collection (system info, interfaces, IP addresses, hardware)
 
 ## Installation
 
@@ -69,6 +69,30 @@ Each check has its own set of command-line options. Here are some examples:
 ### check_interfaces Specific Options
 
 - `-iface`: Filter interfaces by description pattern (optional). Only shows interfaces whose description matches this pattern.
+
+### check_interface_usage
+
+Monitors interface usage by taking two measurements separated by a delay and computing traffic rates. Thresholds (`-warnIn`, `-critIn`, `-warnOut`, `-critOut`) are specified in bps.
+
+```bash
+./cmd/check_interface_usage/check_interface_usage -target 192.168.1.1 -community public -index 2 -delay 10 -warnIn 500000000 -critIn 900000000 -enablePerfData
+```
+
+### check_sysdescr
+
+Checks the device system description (sysDescr) against an optional regex pattern.
+
+```bash
+./cmd/check_sysdescr/check_sysdescr -target 192.168.1.1 -community public -sysDescrPattern "Cisco IOS"
+```
+
+### device_inventory
+
+Comprehensive SNMP-based inventory collection: system information, interfaces, IP addresses, physical hardware, and optional CPU/memory metrics. Outputs JSON. See [cmd/device_inventory/README.md](cmd/device_inventory/README.md) for details.
+
+```bash
+./cmd/device_inventory/device_inventory -target 192.168.1.1 -community public
+```
 
 ## Contributing
 
