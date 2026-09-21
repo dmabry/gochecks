@@ -186,13 +186,29 @@ func DetermineInterfaceUsage(first InterfaceMetrics, second InterfaceMetrics, wa
 	intName := first.Name
 	periodDiff := second.Timestamp.Sub(first.Timestamp)
 	period := periodDiff.Seconds()
+
+	// Guard against a non-positive measurement period: a zero or negative
+	// period would divide by zero below, and a sub-second period would
+	// truncate to 0 with uint(period). Return Unknown so Nagios reports a
+	// plugin problem rather than crashing or reporting bogus rates.
+	if period <= 0 {
+		checkResult.SetResult(gomonitor.Unknown, fmt.Sprintf("measurement period is %.3f seconds; two measurements with distinct timestamps are required (check the -delay flag)", period))
+		return checkResult
+	}
+
 	avgLatency := (first.Latency + second.Latency) / 2
-	// Calc rates
-	in := (second.In - first.In) / uint(period)
-	out := (second.Out - first.Out) / uint(period)
-	hcIn := (second.HCIn - first.HCIn) / uint64(period)
-	hcOut := (second.HCOut - first.HCOut) / uint64(period)
-	// Convert to scale
+	// Calc rates. Floating-point division is used so sub-second measurement
+	// periods work correctly; integer division with uint(period) would
+	// truncate a 0.5s period to 0 and divide by zero.
+	inRate := float64(second.In-first.In) / period
+	outRate := float64(second.Out-first.Out) / period
+	hcInRate := float64(second.HCIn-first.HCIn) / period
+	hcOutRate := float64(second.HCOut-first.HCOut) / period
+	in := uint64(inRate)
+	out := uint64(outRate)
+	hcIn := uint64(hcInRate)
+	hcOut := uint64(hcOutRate)
+	// Convert to scale for the human-readable message
 	intIn, intInUnit := convertToScale(uint64(in))
 	intOut, intOutUnit := convertToScale(uint64(out))
 	intHCIn, intHCInUnit := convertToScale(hcIn)
@@ -207,13 +223,23 @@ func DetermineInterfaceUsage(first InterfaceMetrics, second InterfaceMetrics, wa
 		checkResult.AddPerformanceData("hc_out", gomonitor.PerformanceMetric{Value: float64(hcOut * 8), Warn: float64(warnOut), Crit: float64(critOut), Min: 0, Max: float64(first.Speed), UnitOM: "bps"})
 	}
 
-	if intIn > uint64(critIn) || intHCIn > uint64(critIn) {
+	// Compare in bps: warnIn/critIn/warnOut/critOut are documented in bps, so
+	// the thresholds are matched against the raw bits-per-second rates
+	// (octets * 8), not the human-scaled values (Kbps/Mbps/Gbps) which only
+	// belong in the message. Comparing scaled values against bps thresholds
+	// silently disabled alerting.
+	inBps := uint64(in * 8)
+	outBps := uint64(out * 8)
+	hcInBps := hcIn * 8
+	hcOutBps := hcOut * 8
+
+	if inBps > uint64(critIn) || hcInBps > uint64(critIn) {
 		checkResult.SetResult(gomonitor.Critical, "Inbound exceeds threshold "+message)
-	} else if intIn > uint64(warnIn) || intHCIn > uint64(warnIn) {
+	} else if inBps > uint64(warnIn) || hcInBps > uint64(warnIn) {
 		checkResult.SetResult(gomonitor.Warning, "Inbound exceeds threshold "+message)
-	} else if intOut > uint64(critOut) || intHCOut > uint64(critOut) {
+	} else if outBps > uint64(critOut) || hcOutBps > uint64(critOut) {
 		checkResult.SetResult(gomonitor.Critical, "Outbound exceeds threshold "+message)
-	} else if intOut > uint64(warnOut) || intHCOut > uint64(warnOut) {
+	} else if outBps > uint64(warnOut) || hcOutBps > uint64(warnOut) {
 		checkResult.SetResult(gomonitor.Warning, "Outbound exceeds threshold "+message)
 	} else {
 		checkResult.SetResult(gomonitor.OK, message)
