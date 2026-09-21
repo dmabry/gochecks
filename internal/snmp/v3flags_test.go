@@ -225,7 +225,11 @@ func TestCreateGoSNMPV3Config(t *testing.T) {
 		t.Logf("Connect failed (no local SNMP agent expected in test env): %v", err)
 		return
 	}
-	defer snmpClient.Conn.Close()
+	defer func() {
+		if closeErr := snmpClient.Conn.Close(); closeErr != nil {
+			t.Logf("error closing SNMP connection: %v", closeErr)
+		}
+	}()
 	if snmpClient.Version != gosnmp.Version3 {
 		t.Errorf("Version = %v, want Version3", snmpClient.Version)
 	}
