@@ -249,3 +249,67 @@ func TestCreateGoSNMPV3Config(t *testing.T) {
 		t.Errorf("USM = %+v", usm)
 	}
 }
+
+// TestVersionOrDefault_UnsetFlagIsV2c verifies the unset -snmpVersion flag
+// maps to gosnmp.Version2c, not v1. Regression: an unset flag.Value keeps its
+// Go zero value, and Version 0 equals gosnmp.Version1 (0x0), so binaries that
+// read Version directly sent SNMPv1 requests (breaking BulkWalk-based checks)
+// while the flag's String() helpfully reported "2c".
+func TestVersionOrDefault_UnsetFlagIsV2c(t *testing.T) {
+	tests := []struct {
+		name  string
+		input *string // nil means the flag was never set
+		want  gosnmp.SnmpVersion
+	}{
+		{name: "unset flag defaults to 2c", input: nil, want: gosnmp.Version2c},
+		{name: "explicit 2c", input: strPtr("2c"), want: gosnmp.Version2c},
+		{name: "explicit 3", input: strPtr("3"), want: gosnmp.Version3},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			f := &SNMPVersionFlag{}
+			if tc.input != nil {
+				if err := f.Set(*tc.input); err != nil {
+					t.Fatalf("Set(%q): %v", *tc.input, err)
+				}
+			}
+			if got := f.VersionOrDefault(); got != tc.want {
+				t.Errorf("VersionOrDefault() = %v, want %v", got, tc.want)
+			}
+		})
+	}
+
+	// Nil receiver must also be safe (flag package can call methods on a nil
+	// pointer before Set is ever invoked).
+	var f *SNMPVersionFlag
+	if got := f.VersionOrDefault(); got != gosnmp.Version2c {
+		t.Errorf("nil flag VersionOrDefault() = %v, want Version2c", got)
+	}
+}
+
+// TestVersionOrDefaultThroughFlagParse verifies the full flag-parse path a
+// binary uses: register with flag.Var, parse args WITHOUT -snmpVersion, and
+// confirm VersionOrDefault returns v2c.
+func TestVersionOrDefaultThroughFlagParse(t *testing.T) {
+	fs := flag.NewFlagSet("test", flag.ContinueOnError)
+	sv := &SNMPVersionFlag{}
+	fs.Var(sv, "snmpVersion", "SNMP protocol version.")
+	// Mirror the binaries: register the v3 flags on the same flag set.
+	snmpUser := fs.String("v3Username", "", "SNMP v3 USM username.")
+
+	// Parse args that omit -snmpVersion entirely, exactly as a v2c deployment
+	// invokes the checks.
+	if err := fs.Parse([]string{"-v3Username", "monitor"}); err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if *snmpUser != "monitor" {
+		t.Fatalf("v3Username = %q, want monitor", *snmpUser)
+	}
+
+	if got := sv.VersionOrDefault(); got != gosnmp.Version2c {
+		t.Errorf("after parse without -snmpVersion, VersionOrDefault() = %v, want Version2c", got)
+	}
+}
+
+func strPtr(s string) *string { return &s }

@@ -59,6 +59,19 @@ func (v *SNMPVersionFlag) Set(s string) error {
 	return nil
 }
 
+// VersionOrDefault returns the parsed SNMP version, mapping the zero value
+// left by an unset flag to gosnmp.Version2c. Without this mapping, an unset
+// -snmpVersion leaves Version == 0, which equals gosnmp.Version1 (0x0), so
+// clients would silently send SNMPv1 requests instead of the documented v2c
+// default. Call this instead of reading Version directly when constructing
+// SNMP clients from CLI flags.
+func (v *SNMPVersionFlag) VersionOrDefault() gosnmp.SnmpVersion {
+	if v == nil || v.Version == 0 {
+		return gosnmp.Version2c
+	}
+	return v.Version
+}
+
 // AddV3Flags registers SNMP v3 USM flags (username, auth protocol and
 // passphrase, priv protocol and passphrase) on the flag set. Use with
 // -snmpVersion 3.
