@@ -265,13 +265,15 @@ func main() {
 	v3Username, v3AuthProtocol, v3AuthPassphrase, v3PrivProtocol, v3PrivPassphrase := snmp.AddV3Flags(flag.CommandLine)
 	flag.Parse()
 
+	version := snmpVersion.VersionOrDefault()
+
 	snmpClient := snmp.Client{
 		Target:    *target,
 		Community: *community,
-		Version:   snmpVersion.Version,
+		Version:   version,
 	}
 
-	if snmpVersion.Version == gosnmp.Version3 {
+	if version == gosnmp.Version3 {
 		if err := snmp.ApplyV3Flags(&snmpClient, *v3Username, v3AuthProtocol.Protocol, *v3AuthPassphrase, v3PrivProtocol.Protocol, *v3PrivPassphrase); err != nil {
 			checkResult := gomonitor.NewCheckResult()
 			checkResult.SetResult(gomonitor.Unknown, err.Error())
