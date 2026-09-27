@@ -62,7 +62,18 @@ func CheckSysDescr(snmpClient *snmp.Client, expectedSysDescrRegExp string, enabl
 	}
 
 	checkResult := gomonitor.NewCheckResult()
-	sysDescr := string(result.Variables[0].Value.([]uint8))
+	if len(result.Variables) == 0 || result.Variables[0].Value == nil {
+		eMessage := fmt.Sprintf("SNMP target %s returned no sysDescr value.", snmpClient.Target)
+		checkResult.SetResult(gomonitor.Critical, eMessage)
+		return checkResult
+	}
+	sysDescrBytes, ok := result.Variables[0].Value.([]byte)
+	if !ok {
+		eMessage := fmt.Sprintf("SNMP target %s returned an unexpected sysDescr type: %T.", snmpClient.Target, result.Variables[0].Value)
+		checkResult.SetResult(gomonitor.Critical, eMessage)
+		return checkResult
+	}
+	sysDescr := string(sysDescrBytes)
 
 	// Compare result with expected sysDescr using regexp
 	if expectedSysDescrRegExp != "" {
@@ -78,7 +89,7 @@ func CheckSysDescr(snmpClient *snmp.Client, expectedSysDescrRegExp string, enabl
 
 	if enablePerfData {
 		// If performance data is enabled, add SNMP latency to the check result
-		checkResult.AddPerformanceData("latency", gomonitor.PerformanceMetric{Value: latency.Seconds(), UnitOM: "seconds"})
+		checkResult.AddPerformanceData("latency", gomonitor.PerformanceMetric{Value: latency.Seconds(), UnitOM: "s"})
 	}
 	return checkResult
 }

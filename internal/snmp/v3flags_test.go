@@ -1,6 +1,7 @@
 package snmp
 
 import (
+	"context"
 	"flag"
 	"testing"
 
@@ -220,7 +221,7 @@ func TestCreateGoSNMPV3Config(t *testing.T) {
 	// agent. We only assert that construction does not panic and the
 	// gosnmp-level config is applied by inspecting a failed or successful
 	// connection result.
-	snmpClient, err := c.createGoSNMP()
+	snmpClient, err := c.createGoSNMP(context.Background())
 	if err != nil {
 		t.Logf("Connect failed (no local SNMP agent expected in test env): %v", err)
 		return

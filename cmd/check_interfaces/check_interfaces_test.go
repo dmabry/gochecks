@@ -22,7 +22,7 @@ import (
 	"github.com/dmabry/gochecks/internal/interfaces"
 )
 
-func TestUpdateInterfaceDetails(t *testing.T) {
+func TestSetField(t *testing.T) {
 	tests := []struct {
 		name          string
 		ifaceDetail   *interfaces.InterfaceDetail
@@ -50,14 +50,18 @@ func TestUpdateInterfaceDetails(t *testing.T) {
 					}
 				}()
 			}
-			updateInterfaceDetails(tt.ifaceDetail, tt.oid, tt.value)
+			if err := tt.ifaceDetail.SetField(tt.oid, tt.value); err != nil {
+				t.Errorf("SetField(%v, %T) failed: %v", tt.oid, tt.value, err)
+			}
 		})
 	}
 }
 
-func TestUpdateInterfaceDetailsInBroadcastPkts(t *testing.T) {
+func TestSetFieldInBroadcastPkts(t *testing.T) {
 	iface := &interfaces.InterfaceDetail{}
-	updateInterfaceDetails(iface, interfaces.OIDIfInBroadcastPkts, uint(42))
+	if err := iface.SetField(interfaces.OIDIfInBroadcastPkts, uint(42)); err != nil {
+		t.Fatalf("SetField failed: %v", err)
+	}
 	if iface.InBroadcastPkts != 42 {
 		t.Errorf("InBroadcastPkts = %d, want 42", iface.InBroadcastPkts)
 	}

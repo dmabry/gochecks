@@ -89,33 +89,28 @@ func GetInterfaceStatus(snmpClient *snmp.Client, index int) (*InterfaceStatus, e
 }
 
 // convertToScale converts a given value to the appropriate scale (bps, Kbps, Mbps, or Gbps).
-// The function takes an input value in bits per second (bps) and returns the converted value
-// along with the corresponding unit of measurement.
+// The function takes an input value in octets per second and returns the converted value
+// along with the corresponding unit of measurement. Floating-point math is used so
+// sub-unit precision (e.g. 12.9 Mbps) is preserved instead of truncated.
 //
 // Parameters:
-//   - value: The input value in bits per second (bps) to be converted.
+//   - value: The input value in octets per second to be converted.
 //
 // Returns:
 //   - out: The converted value in the appropriate scale (bps, Kbps, Mbps, or Gbps).
 //   - unit: The corresponding unit of measurement for the converted value.
-func convertToScale(value uint64) (out uint64, unit string) {
-	bps := value * 8
-	if bps < 1000 {
+func convertToScale(value uint64) (out float64, unit string) {
+	bps := float64(value) * 8
+	switch {
+	case bps < 1000:
 		return bps, "bps"
+	case bps < 1000000:
+		return bps / 1000, "Kbps"
+	case bps < 1000000000:
+		return bps / 1000000, "Mbps"
+	default:
+		return bps / 1000000000, "Gbps"
 	}
-
-	kbps := bps / 1000 // convert octets to Kbps
-	if kbps < 1000 {
-		return kbps, "Kbps"
-	}
-
-	mbps := kbps / 1000 // convert Kbps to Mbps
-	if mbps < 1000 {
-		return mbps, "Mbps"
-	}
-
-	gbps := mbps / 1000 // convert Mbps to Gbps
-	return gbps, "Gbps"
 }
 
 // GetInterfaceMetrics retrieves the network interface metrics for a specific interface
@@ -141,23 +136,110 @@ func GetInterfaceMetrics(snmpClient *snmp.Client, index int) (*InterfaceMetrics,
 
 	result, latency, err := snmpClient.GetValue(context.TODO(), usageOIDs)
 	if err != nil {
-		eMessage := "Requested OID: " + err.Error()
-		return nil, fmt.Errorf("%s: %w", eMessage, err)
+		return nil, fmt.Errorf("requested OID: %w", err)
+	}
+
+	if len(result.Variables) < len(usageOIDs) {
+		return nil, fmt.Errorf("interface index %d: expected %d varbinds, got %d", index, len(usageOIDs), len(result.Variables))
+	}
+
+	name, err := varbindString(result.Variables[0].Value)
+	if err != nil {
+		return nil, fmt.Errorf("ifName: %w", err)
+	}
+	in, err := varbindUint(result.Variables[1].Value)
+	if err != nil {
+		return nil, fmt.Errorf("ifInOctets: %w", err)
+	}
+	out, err := varbindUint(result.Variables[2].Value)
+	if err != nil {
+		return nil, fmt.Errorf("ifOutOctets: %w", err)
+	}
+	hcIn, err := varbindUint64(result.Variables[3].Value)
+	if err != nil {
+		return nil, fmt.Errorf("ifHCInOctets: %w", err)
+	}
+	hcOut, err := varbindUint64(result.Variables[4].Value)
+	if err != nil {
+		return nil, fmt.Errorf("ifHCOutOctets: %w", err)
+	}
+	speed, err := varbindUint(result.Variables[5].Value)
+	if err != nil {
+		return nil, fmt.Errorf("ifSpeed: %w", err)
+	}
+	highSpeed, err := varbindUint(result.Variables[6].Value)
+	if err != nil {
+		return nil, fmt.Errorf("ifHighSpeed: %w", err)
 	}
 
 	metrics := &InterfaceMetrics{
-		Name:      string(result.Variables[0].Value.([]uint8)),
-		In:        result.Variables[1].Value.(uint),
-		Out:       result.Variables[2].Value.(uint),
-		HCIn:      result.Variables[3].Value.(uint64),
-		HCOut:     result.Variables[4].Value.(uint64),
-		Speed:     result.Variables[5].Value.(uint),
-		HighSpeed: result.Variables[6].Value.(uint),
+		Name:      name,
+		In:        in,
+		Out:       out,
+		HCIn:      hcIn,
+		HCOut:     hcOut,
+		Speed:     speed,
+		HighSpeed: highSpeed,
 		Latency:   latency,
 		Timestamp: time.Now(),
 	}
 
 	return metrics, nil
+}
+
+// varbindString accepts the string shapes an SNMP octet string arrives in:
+// gosnmp []byte or a plain Go string.
+func varbindString(value interface{}) (string, error) {
+	switch v := value.(type) {
+	case []byte:
+		return string(v), nil
+	case string:
+		return v, nil
+	default:
+		return "", fmt.Errorf("expected string value, got %T", value)
+	}
+}
+
+// varbindUint accepts uint plus non-negative int and int64, covering
+// Counter32 and Gauge32 values which gosnmp decodes as uint.
+func varbindUint(value interface{}) (uint, error) {
+	switch v := value.(type) {
+	case uint:
+		return v, nil
+	case int:
+		if v < 0 {
+			return 0, fmt.Errorf("expected non-negative value, got %d", v)
+		}
+		return uint(v), nil
+	case int64:
+		if v < 0 {
+			return 0, fmt.Errorf("expected non-negative value, got %d", v)
+		}
+		return uint(v), nil
+	default:
+		return 0, fmt.Errorf("expected uint value, got %T", value)
+	}
+}
+
+// varbindUint64 accepts uint64 plus non-negative int and int64, covering
+// Counter64 values which gosnmp decodes as uint64.
+func varbindUint64(value interface{}) (uint64, error) {
+	switch v := value.(type) {
+	case uint64:
+		return v, nil
+	case int:
+		if v < 0 {
+			return 0, fmt.Errorf("expected non-negative value, got %d", v)
+		}
+		return uint64(v), nil
+	case int64:
+		if v < 0 {
+			return 0, fmt.Errorf("expected non-negative value, got %d", v)
+		}
+		return uint64(v), nil
+	default:
+		return 0, fmt.Errorf("expected uint64 value, got %T", value)
+	}
 }
 
 // DetermineInterfaceUsage calculates the usage of a network interface based on the provided InterfaceMetrics.
@@ -211,12 +293,12 @@ func DetermineInterfaceUsage(first InterfaceMetrics, second InterfaceMetrics, wa
 	hcIn := uint64(hcInRate)
 	hcOut := uint64(hcOutRate)
 	// Convert to scale for the human-readable message
-	intIn, intInUnit := convertToScale(uint64(in))
-	intOut, intOutUnit := convertToScale(uint64(out))
+	intIn, intInUnit := convertToScale(in)
+	intOut, intOutUnit := convertToScale(out)
 	intHCIn, intHCInUnit := convertToScale(hcIn)
 	intHCOut, intHCOutUnit := convertToScale(hcOut)
 	// Craft message
-	message := fmt.Sprintf("%s - In: %d %s Out: %d %s HCIn: %d %s HCOut: %d %s", intName, intIn, intInUnit, intOut, intOutUnit, intHCIn, intHCInUnit, intHCOut, intHCOutUnit)
+	message := fmt.Sprintf("%s - In: %.1f %s Out: %.1f %s HCIn: %.1f %s HCOut: %.1f %s", intName, intIn, intInUnit, intOut, intOutUnit, intHCIn, intHCInUnit, intHCOut, intHCOutUnit)
 	if enablePerf {
 		checkResult.AddPerformanceData("snmp_latency", gomonitor.PerformanceMetric{Value: avgLatency.Seconds(), UnitOM: "s"})
 		checkResult.AddPerformanceData("in", gomonitor.PerformanceMetric{Value: float64(in * 8), Warn: float64(warnIn), Crit: float64(critIn), Min: 0, Max: float64(first.Speed), UnitOM: "bps"})
@@ -235,15 +317,18 @@ func DetermineInterfaceUsage(first InterfaceMetrics, second InterfaceMetrics, wa
 	hcInBps := hcIn * 8
 	hcOutBps := hcOut * 8
 
-	if inBps > uint64(critIn) || hcInBps > uint64(critIn) {
+	// Evaluate critical thresholds for both directions before warnings so an
+	// inbound warning cannot mask an outbound critical.
+	switch {
+	case inBps > uint64(critIn) || hcInBps > uint64(critIn):
 		checkResult.SetResult(gomonitor.Critical, "Inbound exceeds threshold "+message)
-	} else if inBps > uint64(warnIn) || hcInBps > uint64(warnIn) {
-		checkResult.SetResult(gomonitor.Warning, "Inbound exceeds threshold "+message)
-	} else if outBps > uint64(critOut) || hcOutBps > uint64(critOut) {
+	case outBps > uint64(critOut) || hcOutBps > uint64(critOut):
 		checkResult.SetResult(gomonitor.Critical, "Outbound exceeds threshold "+message)
-	} else if outBps > uint64(warnOut) || hcOutBps > uint64(warnOut) {
+	case inBps > uint64(warnIn) || hcInBps > uint64(warnIn):
+		checkResult.SetResult(gomonitor.Warning, "Inbound exceeds threshold "+message)
+	case outBps > uint64(warnOut) || hcOutBps > uint64(warnOut):
 		checkResult.SetResult(gomonitor.Warning, "Outbound exceeds threshold "+message)
-	} else {
+	default:
 		checkResult.SetResult(gomonitor.OK, message)
 	}
 	return checkResult
@@ -308,6 +393,7 @@ func main() {
 		eMessage := fmt.Sprintf("SNMP target %s failed to return data when measuring metrics. %s", snmpClient.Target, err1)
 		checkResult.SetResult(gomonitor.Critical, eMessage)
 		checkResult.SendResult()
+		return
 	}
 
 	// delay
@@ -319,6 +405,7 @@ func main() {
 		eMessage := fmt.Sprintf("SNMP target %s failed to return data when measuring metrics. %s", snmpClient.Target, err2)
 		checkResult.SetResult(gomonitor.Critical, eMessage)
 		checkResult.SendResult()
+		return
 	}
 
 	// Calculate current usage and determine thresholds

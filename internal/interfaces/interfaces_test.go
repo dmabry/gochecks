@@ -90,6 +90,29 @@ func TestInterfaceDetailJSON(t *testing.T) {
 	}
 }
 
+// TestOIDConstantsRFC2863Numbering pins the IF-MIB (RFC 2863) column numbers
+// for the out counters: RFC 2863 inserted ifInUnknownProtos at column 15 and
+// moved the deprecated ifOutNUcastPkts to column 18.
+func TestOIDConstantsRFC2863Numbering(t *testing.T) {
+	tests := []struct {
+		name string
+		oid  string
+		want string
+	}{
+		{name: "ifOutNUcastPkts", oid: OIDIfOutNUcastPkts, want: ".1.3.6.1.2.1.2.2.1.18"},
+		{name: "ifOutDiscards", oid: OIDIfOutDiscards, want: ".1.3.6.1.2.1.2.2.1.19"},
+		{name: "ifOutErrors", oid: OIDIfOutErrors, want: ".1.3.6.1.2.1.2.2.1.20"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.oid != tt.want {
+				t.Errorf("%s = %s, want %s", tt.name, tt.oid, tt.want)
+			}
+		})
+	}
+}
+
 func contains(s, substr string) bool {
 	return len(s) >= len(substr) && (s == substr || containsAt(s, substr))
 }
