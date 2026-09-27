@@ -27,7 +27,7 @@ func TestConvertToScale(t *testing.T) {
 	tests := []struct {
 		name      string
 		input     uint64
-		wantValue uint64
+		wantValue float64
 		wantUnit  string
 	}{
 		{name: "zero", input: 0, wantValue: 0, wantUnit: "bps"},
@@ -37,7 +37,7 @@ func TestConvertToScale(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			value, unit := convertToScale(tt.input)
 			if value != tt.wantValue || unit != tt.wantUnit {
-				t.Errorf("convertToScale(%d) = (%d, %s), want (%d, %s)", tt.input, value, unit, tt.wantValue, tt.wantUnit)
+				t.Errorf("convertToScale(%d) = (%v, %s), want (%v, %s)", tt.input, value, unit, tt.wantValue, tt.wantUnit)
 			}
 		})
 	}
@@ -47,7 +47,7 @@ func TestConvertToScaleBoundaries(t *testing.T) {
 	tests := []struct {
 		name      string
 		input     uint64
-		wantValue uint64
+		wantValue float64
 		wantUnit  string
 	}{
 		{name: "1 byte", input: 1, wantValue: 8, wantUnit: "bps"},
@@ -57,7 +57,7 @@ func TestConvertToScaleBoundaries(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			value, unit := convertToScale(tt.input)
 			if value != tt.wantValue || unit != tt.wantUnit {
-				t.Errorf("convertToScale(%d) = (%d, %s), want (%d, %s)", tt.input, value, unit, tt.wantValue, tt.wantUnit)
+				t.Errorf("convertToScale(%d) = (%v, %s), want (%v, %s)", tt.input, value, unit, tt.wantValue, tt.wantUnit)
 			}
 		})
 	}
@@ -83,11 +83,23 @@ func TestConvertToScaleOverflow(t *testing.T) {
 	}
 }
 
+// TestConvertToScalePrecision verifies that sub-unit precision is preserved:
+// 1,610,000 octets/s is 12.88 Mbps and must not truncate to 12.
+func TestConvertToScalePrecision(t *testing.T) {
+	value, unit := convertToScale(1610000)
+	if unit != "Mbps" {
+		t.Errorf("unit = %s, want Mbps", unit)
+	}
+	if value < 12.87 || value > 12.89 {
+		t.Errorf("value = %v, want ~12.88 (truncated value would be 12)", value)
+	}
+}
+
 func TestConvertToScaleKbpsBoundary(t *testing.T) {
 	tests := []struct {
 		name      string
 		input     uint64
-		wantValue uint64
+		wantValue float64
 		wantUnit  string
 	}{}
 
@@ -95,7 +107,7 @@ func TestConvertToScaleKbpsBoundary(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			value, unit := convertToScale(tt.input)
 			if value != tt.wantValue || unit != tt.wantUnit {
-				t.Errorf("convertToScale(%d) = (%d, %s), want (%d, %s)", tt.input, value, unit, tt.wantValue, tt.wantUnit)
+				t.Errorf("convertToScale(%d) = (%v, %s), want (%v, %s)", tt.input, value, unit, tt.wantValue, tt.wantUnit)
 			}
 		})
 	}

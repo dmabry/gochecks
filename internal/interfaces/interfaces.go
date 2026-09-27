@@ -122,115 +122,118 @@ func (ifaceDetail *InterfaceDetail) ToJsonString() (string, error) {
 }
 
 // SetField sets a field on InterfaceDetail based on the given OID and value.
-// It performs strict type checking and returns an error if the value type does
-// not match the expected type for the OID or if the OID is unrecognized.
+// It accepts the native types gosnmp returns — string or []byte for octet
+// strings, int for SNMP Integer objects, uint for Counter32/Gauge32, uint64
+// for Counter64, and uint32 for TimeTicks — and returns an error if the value
+// type does not fit the OID or if the OID is unrecognized.
 func (ifaceDetail *InterfaceDetail) SetField(oid OID, value interface{}) error {
 	switch oid {
 	case OIDIfDescr:
-		if val, ok := value.(string); ok {
-			ifaceDetail.Description = val
-			return nil
+		val, ok := asString(value)
+		if !ok {
+			return fmt.Errorf("OID %s requires string, got %T", oid, value)
 		}
-		return fmt.Errorf("OID %s requires string, got %T", oid, value)
+		ifaceDetail.Description = val
+		return nil
 
 	case OIDIfName:
-		if val, ok := value.(string); ok {
-			ifaceDetail.Name = val
-			return nil
+		val, ok := asString(value)
+		if !ok {
+			return fmt.Errorf("OID %s requires string, got %T", oid, value)
 		}
-		return fmt.Errorf("OID %s requires string, got %T", oid, value)
+		ifaceDetail.Name = val
+		return nil
 
 	case OIDIfAlias:
-		if val, ok := value.(string); ok {
-			ifaceDetail.Alias = val
-			return nil
+		val, ok := asString(value)
+		if !ok {
+			return fmt.Errorf("OID %s requires string, got %T", oid, value)
 		}
-		return fmt.Errorf("OID %s requires string, got %T", oid, value)
+		ifaceDetail.Alias = val
+		return nil
 
 	case OIDIfPhysAddress:
 		if val, ok := value.([]byte); ok {
-			var parts []string
-			for _, b := range val {
-				parts = append(parts, fmt.Sprintf("%02x", b))
+			if len(val) != 6 {
+				return fmt.Errorf("OID %s requires a 6-byte MAC address, got %d bytes", oid, len(val))
 			}
-			ifaceDetail.PhysAddress = fmt.Sprintf("%s:%s:%s:%s:%s:%s", parts[0], parts[1], parts[2], parts[3], parts[4], parts[5])
+			ifaceDetail.PhysAddress = fmt.Sprintf("%02x:%02x:%02x:%02x:%02x:%02x",
+				val[0], val[1], val[2], val[3], val[4], val[5])
 			return nil
 		}
 		return fmt.Errorf("OID %s requires []byte, got %T", oid, value)
 
 	case OIDIfIndex:
-		switch v := value.(type) {
-		case int:
-			ifaceDetail.Index = v
-			return nil
-		case int64:
-			ifaceDetail.Index = int(v)
-			return nil
+		val, ok := asInt(value)
+		if !ok {
+			return fmt.Errorf("OID %s requires int, got %T", oid, value)
 		}
-		return fmt.Errorf("OID %s requires int, got %T", oid, value)
+		ifaceDetail.Index = val
+		return nil
 
 	case OIDIfType:
-		if val, ok := value.(int); ok {
-			ifaceDetail.Type = val
-			return nil
+		val, ok := asInt(value)
+		if !ok {
+			return fmt.Errorf("OID %s requires int, got %T", oid, value)
 		}
-		return fmt.Errorf("OID %s requires int, got %T", oid, value)
+		ifaceDetail.Type = val
+		return nil
 
 	case OIDIfMTU:
-		if val, ok := value.(int); ok {
-			ifaceDetail.MTU = val
-			return nil
+		val, ok := asInt(value)
+		if !ok {
+			return fmt.Errorf("OID %s requires int, got %T", oid, value)
 		}
-		return fmt.Errorf("OID %s requires int, got %T", oid, value)
+		ifaceDetail.MTU = val
+		return nil
 
 	case OIDIfSpeed:
-		switch v := value.(type) {
-		case uint:
-			ifaceDetail.Speed = v
-			return nil
-		case int:
-			if v < 0 {
-				return fmt.Errorf("OID %s requires non-negative uint, got %d", oid, v)
-			}
-			ifaceDetail.Speed = uint(v)
-			return nil
+		val, ok := asUint(value)
+		if !ok {
+			return fmt.Errorf("OID %s requires uint, got %T", oid, value)
 		}
-		return fmt.Errorf("OID %s requires uint, got %T", oid, value)
+		ifaceDetail.Speed = val
+		return nil
 
 	case OIDIfHighSpeed:
-		if val, ok := value.(uint); ok {
-			ifaceDetail.HighSpeed = val
-			return nil
+		val, ok := asUint(value)
+		if !ok {
+			return fmt.Errorf("OID %s requires uint, got %T", oid, value)
 		}
-		return fmt.Errorf("OID %s requires uint, got %T", oid, value)
+		ifaceDetail.HighSpeed = val
+		return nil
 
 	case OIDIfOperStatus:
-		if val, ok := value.(int); ok {
-			ifaceDetail.OperStatus = val
-			return nil
+		val, ok := asInt(value)
+		if !ok {
+			return fmt.Errorf("OID %s requires int, got %T", oid, value)
 		}
-		return fmt.Errorf("OID %s requires int, got %T", oid, value)
+		ifaceDetail.OperStatus = val
+		return nil
 
 	case OIDIfAdminStatus:
-		if val, ok := value.(int); ok {
-			ifaceDetail.AdminStatus = val
-			return nil
+		val, ok := asInt(value)
+		if !ok {
+			return fmt.Errorf("OID %s requires int, got %T", oid, value)
 		}
-		return fmt.Errorf("OID %s requires int, got %T", oid, value)
+		ifaceDetail.AdminStatus = val
+		return nil
 
 	case OIDIfInOctets:
-		if val, ok := value.(uint); ok {
-			ifaceDetail.InOctets = val
-			return nil
+		val, ok := asUint(value)
+		if !ok {
+			return fmt.Errorf("OID %s requires uint, got %T", oid, value)
 		}
-		return fmt.Errorf("OID %s requires uint, got %T", oid, value)
+		ifaceDetail.InOctets = val
+		return nil
 
 	case OIDIfOutOctets:
-		if val, ok := value.(uint); ok {
-			ifaceDetail.OutOctets = val
-			return nil
+		val, ok := asUint(value)
+		if !ok {
+			return fmt.Errorf("OID %s requires uint, got %T", oid, value)
 		}
-		return fmt.Errorf("OID %s requires uint, got %T", oid, value)
+		ifaceDetail.OutOctets = val
+		return nil
 
 	case OIDIfHCInOctets:
 		if val, ok := value.(uint64); ok {
@@ -247,18 +250,20 @@ func (ifaceDetail *InterfaceDetail) SetField(oid OID, value interface{}) error {
 		return fmt.Errorf("OID %s requires uint64, got %T", oid, value)
 
 	case OIDIfInUcastPkts:
-		if val, ok := value.(uint); ok {
-			ifaceDetail.InUcastPkts = val
-			return nil
+		val, ok := asUint(value)
+		if !ok {
+			return fmt.Errorf("OID %s requires uint, got %T", oid, value)
 		}
-		return fmt.Errorf("OID %s requires uint, got %T", oid, value)
+		ifaceDetail.InUcastPkts = val
+		return nil
 
 	case OIDIfOutUcastPkts:
-		if val, ok := value.(uint); ok {
-			ifaceDetail.OutUcastPkts = val
-			return nil
+		val, ok := asUint(value)
+		if !ok {
+			return fmt.Errorf("OID %s requires uint, got %T", oid, value)
 		}
-		return fmt.Errorf("OID %s requires uint, got %T", oid, value)
+		ifaceDetail.OutUcastPkts = val
+		return nil
 
 	case OIDIfHCInUcastPkts:
 		if val, ok := value.(uint64); ok {
@@ -275,18 +280,20 @@ func (ifaceDetail *InterfaceDetail) SetField(oid OID, value interface{}) error {
 		return fmt.Errorf("OID %s requires uint64, got %T", oid, value)
 
 	case OIDIfInMulticastPkts:
-		if val, ok := value.(uint); ok {
-			ifaceDetail.InMulticastPkts = val
-			return nil
+		val, ok := asUint(value)
+		if !ok {
+			return fmt.Errorf("OID %s requires uint, got %T", oid, value)
 		}
-		return fmt.Errorf("OID %s requires uint, got %T", oid, value)
+		ifaceDetail.InMulticastPkts = val
+		return nil
 
 	case OIDIfOutMulticastPkts:
-		if val, ok := value.(uint); ok {
-			ifaceDetail.OutMulticastPkts = val
-			return nil
+		val, ok := asUint(value)
+		if !ok {
+			return fmt.Errorf("OID %s requires uint, got %T", oid, value)
 		}
-		return fmt.Errorf("OID %s requires uint, got %T", oid, value)
+		ifaceDetail.OutMulticastPkts = val
+		return nil
 
 	case OIDIfHCInMulticastPkts:
 		if val, ok := value.(uint64); ok {
@@ -303,18 +310,20 @@ func (ifaceDetail *InterfaceDetail) SetField(oid OID, value interface{}) error {
 		return fmt.Errorf("OID %s requires uint64, got %T", oid, value)
 
 	case OIDIfInBroadcastPkts:
-		if val, ok := value.(uint); ok {
-			ifaceDetail.InBroadcastPkts = val
-			return nil
+		val, ok := asUint(value)
+		if !ok {
+			return fmt.Errorf("OID %s requires uint, got %T", oid, value)
 		}
-		return fmt.Errorf("OID %s requires uint, got %T", oid, value)
+		ifaceDetail.InBroadcastPkts = val
+		return nil
 
 	case OIDIfOutBroadcastPkts:
-		if val, ok := value.(uint); ok {
-			ifaceDetail.OutBroadcastPkts = val
-			return nil
+		val, ok := asUint(value)
+		if !ok {
+			return fmt.Errorf("OID %s requires uint, got %T", oid, value)
 		}
-		return fmt.Errorf("OID %s requires uint, got %T", oid, value)
+		ifaceDetail.OutBroadcastPkts = val
+		return nil
 
 	case OIDIfHCInBroadcastPkts:
 		if val, ok := value.(uint64); ok {
@@ -331,46 +340,52 @@ func (ifaceDetail *InterfaceDetail) SetField(oid OID, value interface{}) error {
 		return fmt.Errorf("OID %s requires uint64, got %T", oid, value)
 
 	case OIDIfInNUcastPkts:
-		if val, ok := value.(uint); ok {
-			ifaceDetail.InNUcastPkts = val
-			return nil
+		val, ok := asUint(value)
+		if !ok {
+			return fmt.Errorf("OID %s requires uint, got %T", oid, value)
 		}
-		return fmt.Errorf("OID %s requires uint, got %T", oid, value)
+		ifaceDetail.InNUcastPkts = val
+		return nil
 
 	case OIDIfOutNUcastPkts:
-		if val, ok := value.(uint); ok {
-			ifaceDetail.OutNUcastPkts = val
-			return nil
+		val, ok := asUint(value)
+		if !ok {
+			return fmt.Errorf("OID %s requires uint, got %T", oid, value)
 		}
-		return fmt.Errorf("OID %s requires uint, got %T", oid, value)
+		ifaceDetail.OutNUcastPkts = val
+		return nil
 
 	case OIDIfInErrors:
-		if val, ok := value.(uint); ok {
-			ifaceDetail.InErrors = val
-			return nil
+		val, ok := asUint(value)
+		if !ok {
+			return fmt.Errorf("OID %s requires uint, got %T", oid, value)
 		}
-		return fmt.Errorf("OID %s requires uint, got %T", oid, value)
+		ifaceDetail.InErrors = val
+		return nil
 
 	case OIDIfOutErrors:
-		if val, ok := value.(uint); ok {
-			ifaceDetail.OutErrors = val
-			return nil
+		val, ok := asUint(value)
+		if !ok {
+			return fmt.Errorf("OID %s requires uint, got %T", oid, value)
 		}
-		return fmt.Errorf("OID %s requires uint, got %T", oid, value)
+		ifaceDetail.OutErrors = val
+		return nil
 
 	case OIDIfInDiscards:
-		if val, ok := value.(uint); ok {
-			ifaceDetail.InDiscards = val
-			return nil
+		val, ok := asUint(value)
+		if !ok {
+			return fmt.Errorf("OID %s requires uint, got %T", oid, value)
 		}
-		return fmt.Errorf("OID %s requires uint, got %T", oid, value)
+		ifaceDetail.InDiscards = val
+		return nil
 
 	case OIDIfOutDiscards:
-		if val, ok := value.(uint); ok {
-			ifaceDetail.OutDiscards = val
-			return nil
+		val, ok := asUint(value)
+		if !ok {
+			return fmt.Errorf("OID %s requires uint, got %T", oid, value)
 		}
-		return fmt.Errorf("OID %s requires uint, got %T", oid, value)
+		ifaceDetail.OutDiscards = val
+		return nil
 
 	case OIDIfLastChange:
 		if val, ok := value.(uint32); ok {
@@ -380,25 +395,28 @@ func (ifaceDetail *InterfaceDetail) SetField(oid OID, value interface{}) error {
 		return fmt.Errorf("OID %s requires uint32, got %T", oid, value)
 
 	case OIDIfLinkUpDownTrapEnable:
-		if val, ok := value.(int); ok {
-			ifaceDetail.LinkUpDownTrapEnable = val
-			return nil
+		val, ok := asInt(value)
+		if !ok {
+			return fmt.Errorf("OID %s requires int, got %T", oid, value)
 		}
-		return fmt.Errorf("OID %s requires int, got %T", oid, value)
+		ifaceDetail.LinkUpDownTrapEnable = val
+		return nil
 
 	case OIDIfPromiscuousMode:
-		if val, ok := value.(int); ok {
-			ifaceDetail.PromiscuousMode = val
-			return nil
+		val, ok := asInt(value)
+		if !ok {
+			return fmt.Errorf("OID %s requires int, got %T", oid, value)
 		}
-		return fmt.Errorf("OID %s requires int, got %T", oid, value)
+		ifaceDetail.PromiscuousMode = val
+		return nil
 
 	case OIDIfConnectorPresent:
-		if val, ok := value.(int); ok {
-			ifaceDetail.ConnectorPresent = val
-			return nil
+		val, ok := asInt(value)
+		if !ok {
+			return fmt.Errorf("OID %s requires int, got %T", oid, value)
 		}
-		return fmt.Errorf("OID %s requires int, got %T", oid, value)
+		ifaceDetail.ConnectorPresent = val
+		return nil
 
 	case OIDIfCounterDiscontinuityTime:
 		if val, ok := value.(uint32); ok {
@@ -412,36 +430,83 @@ func (ifaceDetail *InterfaceDetail) SetField(oid OID, value interface{}) error {
 	}
 }
 
+// asString accepts a Go string or an SNMP OctetString ([]byte).
+func asString(value interface{}) (string, bool) {
+	switch v := value.(type) {
+	case string:
+		return v, true
+	case []byte:
+		return string(v), true
+	default:
+		return "", false
+	}
+}
+
+// asInt accepts int or int64, the shapes SNMP Integer values arrive in.
+func asInt(value interface{}) (int, bool) {
+	switch v := value.(type) {
+	case int:
+		return v, true
+	case int64:
+		return int(v), true
+	default:
+		return 0, false
+	}
+}
+
+// asUint accepts uint plus non-negative int and int64 values, covering
+// Counter32 and Gauge32 values which gosnmp decodes as uint.
+func asUint(value interface{}) (uint, bool) {
+	switch v := value.(type) {
+	case uint:
+		return v, true
+	case int:
+		if v < 0 {
+			return 0, false
+		}
+		return uint(v), true
+	case int64:
+		if v < 0 {
+			return 0, false
+		}
+		return uint(v), true
+	default:
+		return 0, false
+	}
+}
+
 const (
-	OIDIfDescr                    = ".1.3.6.1.2.1.2.2.1.2"
-	OIDIfName                     = ".1.3.6.1.2.1.31.1.1.1.1"
-	OIDIfAlias                    = ".1.3.6.1.2.1.31.1.1.1.18"
-	OIDIfPhysAddress              = ".1.3.6.1.2.1.2.2.1.6"
-	OIDIfIndex                    = ".1.3.6.1.2.1.2.2.1.1"
-	OIDIfType                     = ".1.3.6.1.2.1.2.2.1.3"
-	OIDIfMTU                      = ".1.3.6.1.2.1.2.2.1.4"
-	OIDIfSpeed                    = ".1.3.6.1.2.1.2.2.1.5"
-	OIDIfHighSpeed                = ".1.3.6.1.2.1.31.1.1.1.15"
-	OIDIfOperStatus               = ".1.3.6.1.2.1.2.2.1.8"
-	OIDIfAdminStatus              = ".1.3.6.1.2.1.2.2.1.7"
-	OIDIfInOctets                 = ".1.3.6.1.2.1.2.2.1.10"
-	OIDIfOutOctets                = ".1.3.6.1.2.1.2.2.1.16"
-	OIDIfHCInOctets               = ".1.3.6.1.2.1.31.1.1.1.6"
-	OIDIfHCOutOctets              = ".1.3.6.1.2.1.31.1.1.1.10"
-	OIDIfInUcastPkts              = ".1.3.6.1.2.1.2.2.1.11"
-	OIDIfOutUcastPkts             = ".1.3.6.1.2.1.2.2.1.17"
-	OIDIfHCInUcastPkts            = ".1.3.6.1.2.1.31.1.1.1.7"
-	OIDIfHCOutUcastPkts           = ".1.3.6.1.2.1.31.1.1.1.11"
-	OIDIfInBroadcastPkts          = ".1.3.6.1.2.1.31.1.1.1.3"
-	OIDIfOutBroadcastPkts         = ".1.3.6.1.2.1.31.1.1.1.5"
-	OIDIfHCInBroadcastPkts        = ".1.3.6.1.2.1.31.1.1.1.9"
-	OIDIfHCOutBroadcastPkts       = ".1.3.6.1.2.1.31.1.1.1.13"
-	OIDIfInMulticastPkts          = ".1.3.6.1.2.1.31.1.1.1.2"
-	OIDIfOutMulticastPkts         = ".1.3.6.1.2.1.31.1.1.1.4"
-	OIDIfHCInMulticastPkts        = ".1.3.6.1.2.1.31.1.1.1.8"
-	OIDIfHCOutMulticastPkts       = ".1.3.6.1.2.1.31.1.1.1.12"
-	OIDIfInNUcastPkts             = ".1.3.6.1.2.1.2.2.1.12"
-	OIDIfOutNUcastPkts            = ".1.3.6.1.2.1.2.2.1.15"
+	OIDIfDescr              = ".1.3.6.1.2.1.2.2.1.2"
+	OIDIfName               = ".1.3.6.1.2.1.31.1.1.1.1"
+	OIDIfAlias              = ".1.3.6.1.2.1.31.1.1.1.18"
+	OIDIfPhysAddress        = ".1.3.6.1.2.1.2.2.1.6"
+	OIDIfIndex              = ".1.3.6.1.2.1.2.2.1.1"
+	OIDIfType               = ".1.3.6.1.2.1.2.2.1.3"
+	OIDIfMTU                = ".1.3.6.1.2.1.2.2.1.4"
+	OIDIfSpeed              = ".1.3.6.1.2.1.2.2.1.5"
+	OIDIfHighSpeed          = ".1.3.6.1.2.1.31.1.1.1.15"
+	OIDIfOperStatus         = ".1.3.6.1.2.1.2.2.1.8"
+	OIDIfAdminStatus        = ".1.3.6.1.2.1.2.2.1.7"
+	OIDIfInOctets           = ".1.3.6.1.2.1.2.2.1.10"
+	OIDIfOutOctets          = ".1.3.6.1.2.1.2.2.1.16"
+	OIDIfHCInOctets         = ".1.3.6.1.2.1.31.1.1.1.6"
+	OIDIfHCOutOctets        = ".1.3.6.1.2.1.31.1.1.1.10"
+	OIDIfInUcastPkts        = ".1.3.6.1.2.1.2.2.1.11"
+	OIDIfOutUcastPkts       = ".1.3.6.1.2.1.2.2.1.17"
+	OIDIfHCInUcastPkts      = ".1.3.6.1.2.1.31.1.1.1.7"
+	OIDIfHCOutUcastPkts     = ".1.3.6.1.2.1.31.1.1.1.11"
+	OIDIfInBroadcastPkts    = ".1.3.6.1.2.1.31.1.1.1.3"
+	OIDIfOutBroadcastPkts   = ".1.3.6.1.2.1.31.1.1.1.5"
+	OIDIfHCInBroadcastPkts  = ".1.3.6.1.2.1.31.1.1.1.9"
+	OIDIfHCOutBroadcastPkts = ".1.3.6.1.2.1.31.1.1.1.13"
+	OIDIfInMulticastPkts    = ".1.3.6.1.2.1.31.1.1.1.2"
+	OIDIfOutMulticastPkts   = ".1.3.6.1.2.1.31.1.1.1.4"
+	OIDIfHCInMulticastPkts  = ".1.3.6.1.2.1.31.1.1.1.8"
+	OIDIfHCOutMulticastPkts = ".1.3.6.1.2.1.31.1.1.1.12"
+	OIDIfInNUcastPkts       = ".1.3.6.1.2.1.2.2.1.12"
+	// RFC 2863 (IF-MIB) inserted ifInUnknownProtos at column 15 and moved the
+	// deprecated ifOutNUcastPkts from column 15 (RFC 1213) to column 18.
+	OIDIfOutNUcastPkts            = ".1.3.6.1.2.1.2.2.1.18"
 	OIDIfInErrors                 = ".1.3.6.1.2.1.2.2.1.14"
 	OIDIfOutErrors                = ".1.3.6.1.2.1.2.2.1.20"
 	OIDIfInDiscards               = ".1.3.6.1.2.1.2.2.1.13"

@@ -290,12 +290,65 @@ func TestSetFieldTypeConversions(t *testing.T) {
 	}
 }
 
+// TestSetFieldPhysAddressWithInsufficientData verifies that a MAC value that
+// is not exactly 6 bytes returns an error instead of panicking.
 func TestSetFieldPhysAddressWithInsufficientData(t *testing.T) {
 	iface := &InterfaceDetail{}
-	defer func() {
-		if r := recover(); r == nil {
-			t.Logf("Expected panic for insufficient MAC data - test passes")
-		}
-	}()
-	_ = iface.SetField(OIDIfPhysAddress, []byte{0x00})
+	err := iface.SetField(OIDIfPhysAddress, []byte{0x00})
+
+	if err == nil {
+		t.Error("Expected error for MAC address with insufficient bytes")
+	}
+}
+
+// TestSetFieldGosnmpNativeTypes verifies SetField accepts the native value
+// types gosnmp returns: []byte for octet strings, uint for Counter32/Gauge32,
+// and int64 for Integer objects.
+func TestSetFieldGosnmpNativeTypes(t *testing.T) {
+	tests := []struct {
+		name        string
+		oid         OID
+		value       interface{}
+		expectedErr bool
+		check       func(*InterfaceDetail) bool
+	}{
+		{
+			name:  "octet string bytes - Description",
+			oid:   OIDIfDescr,
+			value: []byte("eth0"),
+			check: func(i *InterfaceDetail) bool { return i.Description == "eth0" },
+		},
+		{
+			name:  "octet string bytes - Name",
+			oid:   OIDIfName,
+			value: []byte("eth0"),
+			check: func(i *InterfaceDetail) bool { return i.Name == "eth0" },
+		},
+		{
+			name:  "int64 - Index",
+			oid:   OIDIfIndex,
+			value: int64(7),
+			check: func(i *InterfaceDetail) bool { return i.Index == 7 },
+		},
+		{
+			name:        "negative int - Speed",
+			oid:         OIDIfSpeed,
+			value:       -1,
+			expectedErr: true,
+			check:       func(i *InterfaceDetail) bool { return i.Speed == 0 },
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			iface := &InterfaceDetail{}
+			err := iface.SetField(tt.oid, tt.value)
+			if (err != nil) != tt.expectedErr {
+				t.Fatalf("SetField() error = %v, expectedErr %v", err, tt.expectedErr)
+			}
+			if !tt.expectedErr && !tt.check(iface) {
+				t.Errorf("Field not set correctly")
+			}
+		})
+	}
 }

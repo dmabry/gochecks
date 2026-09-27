@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 )
 
 func TestIsRetryableErr(t *testing.T) {
@@ -211,6 +212,73 @@ func TestRetryPolicyFromEnv(t *testing.T) {
 				t.Errorf("retryPolicyFromEnv() MaxRetries = %d, want %d", policy.MaxRetries, tt.maxRetries)
 			}
 		})
+	}
+}
+
+// TestRetryPolicyFromEnvDelay verifies the GOCHECKS_SNMP_RETRY_DELAY
+// environment variable overrides the default base retry delay.
+func TestRetryPolicyFromEnvDelay(t *testing.T) {
+	t.Setenv("GOCHECKS_SNMP_RETRY_DELAY", "5")
+
+	policy := retryPolicyFromEnv()
+	if policy.RetryDelay != 5*time.Second {
+		t.Errorf("retryPolicyFromEnv() RetryDelay = %v, want 5s", policy.RetryDelay)
+	}
+	if policy.MaxRetries != defaultMaxRetries {
+		t.Errorf("retryPolicyFromEnv() MaxRetries = %d, want %d", policy.MaxRetries, defaultMaxRetries)
+	}
+}
+
+// TestRetryBackoff verifies the exponential backoff schedule: the base delay
+// doubles on each subsequent attempt and is capped at maxRetryBackoff. A
+// zero delay disables backoff entirely.
+func TestRetryBackoff(t *testing.T) {
+	tests := []struct {
+		name       string
+		retryDelay time.Duration
+		attempt    int
+		want       time.Duration
+	}{
+		{name: "zero delay disables backoff", retryDelay: 0, attempt: 3, want: 0},
+		{name: "first attempt uses base delay", retryDelay: time.Second, attempt: 0, want: time.Second},
+		{name: "second attempt doubles", retryDelay: time.Second, attempt: 1, want: 2 * time.Second},
+		{name: "third attempt quadruples", retryDelay: time.Second, attempt: 2, want: 4 * time.Second},
+		{name: "capped at max", retryDelay: 10 * time.Second, attempt: 5, want: maxRetryBackoff},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			p := RetryPolicy{RetryDelay: tt.retryDelay}
+			if got := p.backoff(tt.attempt); got != tt.want {
+				t.Errorf("backoff(%d) = %v, want %v", tt.attempt, got, tt.want)
+			}
+		})
+	}
+}
+
+// TestWithRetryCancelledDuringBackoff verifies a cancelled context aborts the
+// backoff wait instead of retrying, even when the delay is long.
+func TestWithRetryCancelledDuringBackoff(t *testing.T) {
+	client := &Client{
+		Target:      "127.0.0.1",
+		Community:   "public",
+		retryPolicy: RetryPolicy{Enabled: true, MaxRetries: 3, RetryDelay: time.Hour},
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	attempts := 0
+	_, err := client.withRetry(ctx, func() (interface{}, error) {
+		attempts++
+		return nil, errors.New("connection refused")
+	})
+
+	if err == nil {
+		t.Error("expected context error from cancelled context")
+	}
+	if attempts != 1 {
+		t.Errorf("attempts = %d, want 1 (cancelled context must not retry)", attempts)
 	}
 }
 

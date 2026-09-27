@@ -1,6 +1,7 @@
 package main
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -78,6 +79,33 @@ func TestDetermineInterfaceUsage_ThresholdsInBps(t *testing.T) {
 				t.Errorf("got %s (%q), want %s", got.ExitCode, got.Message, tc.wantCode)
 			}
 		})
+	}
+}
+
+// TestDetermineInterfaceUsage_CriticalNotMaskedByWarning verifies that an
+// outbound critical is not masked by an inbound warning: critical thresholds
+// for both directions are evaluated before any warning threshold.
+// Regression: inbound conditions were checked first, so an inbound warning
+// reported Warning even when outbound traffic exceeded its critical threshold.
+func TestDetermineInterfaceUsage_CriticalNotMaskedByWarning(t *testing.T) {
+	// 750 Kbps inbound (exceeds the 500 Kbps warning, below the 1 Mbps
+	// critical) and 3 Mbps outbound (exceeds the 2 Mbps critical): the
+	// result must be Critical naming the outbound direction.
+	first := testMetrics(baseTime(), 0)
+	first.In = 0
+	second := testMetrics(baseTime().Add(10*time.Second), 0)
+	second.In = 93750 * 10   // 750 Kbps inbound rate
+	second.Out = 375000 * 10 // 3 Mbps outbound rate
+	second.HCIn = 93750 * 10
+	second.HCOut = 375000 * 10
+
+	got := DetermineInterfaceUsage(first, second, 500000, 1000000, 1000000, 2000000, false)
+
+	if got.ExitCode != gomonitor.Critical {
+		t.Errorf("got %s (%q), want Critical", got.ExitCode, got.Message)
+	}
+	if !strings.Contains(got.Message, "Outbound exceeds threshold") {
+		t.Errorf("message %q should name the outbound direction", got.Message)
 	}
 }
 

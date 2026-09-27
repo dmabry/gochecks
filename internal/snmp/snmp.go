@@ -28,16 +28,36 @@ import (
 	"log"
 )
 
-// timeout15 is a constant representing a timeout duration of 15 seconds.
 const (
 	timeout15         = time.Duration(15) * time.Second
 	defaultMaxRetries = 3
+	defaultRetryDelay = time.Second
+	maxRetryBackoff   = 30 * time.Second
 )
 
 // RetryPolicy defines the retry behavior for SNMP operations.
 type RetryPolicy struct {
 	Enabled    bool
 	MaxRetries int
+	// RetryDelay is the base wait before the first retry. Each subsequent
+	// retry doubles the delay, capped at maxRetryBackoff. Zero disables
+	// backoff (retries fire immediately).
+	RetryDelay time.Duration
+}
+
+// backoff returns the wait duration before the retry following attempt.
+func (p RetryPolicy) backoff(attempt int) time.Duration {
+	if p.RetryDelay <= 0 {
+		return 0
+	}
+	delay := p.RetryDelay
+	for i := 0; i < attempt && delay < maxRetryBackoff; i++ {
+		delay *= 2
+	}
+	if delay > maxRetryBackoff {
+		delay = maxRetryBackoff
+	}
+	return delay
 }
 
 // Client represents an SNMP client that allows connecting to a target SNMP device.
@@ -184,10 +204,12 @@ func (c *Client) SetRetryPolicy(policy RetryPolicy) {
 // retryPolicyFromEnv reads retry configuration from environment variables.
 // GOCHECKS_SNMP_RETRY_ENABLED controls whether retries are enabled (default: false).
 // GOCHECKS_SNMP_MAX_RETRIES sets the maximum retry count (default: 3).
+// GOCHECKS_SNMP_RETRY_DELAY sets the base retry delay in seconds (default: 1).
 func retryPolicyFromEnv() RetryPolicy {
 	policy := RetryPolicy{
 		Enabled:    false,
 		MaxRetries: defaultMaxRetries,
+		RetryDelay: defaultRetryDelay,
 	}
 
 	if v := os.Getenv("GOCHECKS_SNMP_RETRY_ENABLED"); v != "" {
@@ -197,6 +219,12 @@ func retryPolicyFromEnv() RetryPolicy {
 	if v := os.Getenv("GOCHECKS_SNMP_MAX_RETRIES"); v != "" {
 		if n, err := strconv.Atoi(v); err == nil && n >= 0 {
 			policy.MaxRetries = n
+		}
+	}
+
+	if v := os.Getenv("GOCHECKS_SNMP_RETRY_DELAY"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n >= 0 {
+			policy.RetryDelay = time.Duration(n) * time.Second
 		}
 	}
 
@@ -258,11 +286,12 @@ func (c *Client) withRetry(ctx context.Context, op func() (interface{}, error)) 
 			break
 		}
 
-		// Check if context is cancelled before retrying
+		// Wait with exponential backoff before retrying; a cancelled
+		// context aborts the wait instead of retrying.
 		select {
 		case <-ctx.Done():
 			return nil, ctx.Err()
-		default:
+		case <-time.After(c.retryPolicy.backoff(attempt)):
 		}
 	}
 
@@ -271,13 +300,16 @@ func (c *Client) withRetry(ctx context.Context, op func() (interface{}, error)) 
 
 // createGoSNMP creates and connects a new gosnmp.GoSNMP instance configured
 // for the client's SNMP version: v2c (community) or v3 (USM security model).
-func (s *Client) createGoSNMP() (*gosnmp.GoSNMP, error) {
+// The context is stored on the connection so gosnmp honors deadlines and
+// cancellation for each request.
+func (s *Client) createGoSNMP(ctx context.Context) (*gosnmp.GoSNMP, error) {
 	snmpClient := &gosnmp.GoSNMP{
 		Target:    s.Target,
 		Port:      161,
 		Community: s.Community,
 		Version:   s.Version,
 		Timeout:   timeout15,
+		Context:   ctx,
 	}
 
 	if s.Version == gosnmp.Version3 {
@@ -299,34 +331,54 @@ func (s *Client) createGoSNMP() (*gosnmp.GoSNMP, error) {
 	return snmpClient, nil
 }
 
+// ensureConnected returns the cached gosnmp connection, creating and caching
+// a new one when absent. The context is applied to the new connection.
+func (s *Client) ensureConnected(ctx context.Context) (*gosnmp.GoSNMP, error) {
+	if s.snmpClient != nil && s.snmpClient.Conn != nil {
+		return s.snmpClient, nil
+	}
+
+	snmpClient, err := s.createGoSNMP(ctx)
+	if err != nil {
+		return nil, err
+	}
+	s.snmpClient = snmpClient
+	return snmpClient, nil
+}
+
+// dropConnection closes and forgets the cached connection so the next
+// operation reconnects, for example after a network error.
+func (s *Client) dropConnection() {
+	if s.snmpClient != nil && s.snmpClient.Conn != nil {
+		if closeErr := s.snmpClient.Conn.Close(); closeErr != nil {
+			log.Printf("Error closing SNMP connection: %v", closeErr)
+		}
+	}
+	s.snmpClient = nil
+}
+
 // Connect establishes a connection to the SNMP target with context support.
 // If the context is nil, it is treated as context.Background().
-// The connection attempt is retried according to the client's retry policy.
-//
-// Example usage:
-//
-//	err := client.Connect(ctx)
-//	if err != nil {
-//
-// Connect establishes a connection to the SNMP target with context support.
-// If the context is nil, it is treated as context.Background().
-// The connection attempt is retried according to the client's retry policy.
+// The connection attempt is retried according to the client's retry policy,
+// and the connected gosnmp client is cached for reuse by GetValue and Walk.
 func (s *Client) Connect(ctx context.Context) error {
 	_, err := s.withRetry(ctx, func() (interface{}, error) {
-		snmpClient, err := s.createGoSNMP()
+		snmpClient, err := s.ensureConnected(ctx)
 		if err != nil {
 			return nil, err
 		}
-		s.snmpClient = snmpClient
 		return snmpClient, nil
 	})
 	return err
 }
 
-// Close closes the underlying SNMP connection.
+// Close closes the underlying SNMP connection and clears the cache so a
+// later operation reconnects.
 func (s *Client) Close() error {
 	if s.snmpClient != nil && s.snmpClient.Conn != nil {
-		return s.snmpClient.Conn.Close()
+		err := s.snmpClient.Conn.Close()
+		s.snmpClient = nil
+		return err
 	}
 	return nil
 }
@@ -340,19 +392,21 @@ func (s *Client) GetValue(ctx context.Context, oids []string) (*gosnmp.SnmpPacke
 	var latency time.Duration
 
 	_, err := s.withRetry(ctx, func() (interface{}, error) {
-		snmpClient, err := s.createGoSNMP()
+		snmpClient, err := s.ensureConnected(ctx)
 		if err != nil {
 			return nil, err
 		}
-		defer func() {
-			if closeErr := snmpClient.Conn.Close(); closeErr != nil {
-				log.Printf("Error closing SNMP connection: %v", closeErr)
-			}
-		}()
+		// Apply the current context to reused connections so gosnmp honors
+		// deadlines and cancellation for this request.
+		if ctx != nil {
+			snmpClient.Context = ctx
+		}
 
 		start := time.Now()
 		pkt, err := snmpClient.Get(oids)
 		if err != nil {
+			// Drop the cached connection so the next attempt reconnects.
+			s.dropConnection()
 			return nil, err
 		}
 
@@ -373,15 +427,15 @@ func (s *Client) Walk(ctx context.Context, baseOid string) (map[string]interface
 	var latency time.Duration
 
 	_, err := s.withRetry(ctx, func() (interface{}, error) {
-		snmpClient, err := s.createGoSNMP()
+		snmpClient, err := s.ensureConnected(ctx)
 		if err != nil {
 			return nil, err
 		}
-		defer func() {
-			if closeErr := snmpClient.Conn.Close(); closeErr != nil {
-				log.Printf("Error closing SNMP connection: %v", closeErr)
-			}
-		}()
+		// Apply the current context to reused connections so gosnmp honors
+		// deadlines and cancellation for this request.
+		if ctx != nil {
+			snmpClient.Context = ctx
+		}
 
 		start := time.Now()
 		oidValues := make(map[string]interface{})
@@ -391,6 +445,8 @@ func (s *Client) Walk(ctx context.Context, baseOid string) (map[string]interface
 			return nil
 		})
 		if err != nil {
+			// Drop the cached connection so the next attempt reconnects.
+			s.dropConnection()
 			return nil, err
 		}
 
