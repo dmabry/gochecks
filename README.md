@@ -19,7 +19,8 @@ gochecks currently includes the following checks:
 1. **check_interfaces**: Monitors interface metrics such as status, speed, traffic counters, etc.
 2. **check_interface_usage**: Monitors interface usage statistics and utilization
 3. **check_sysdescr**: Checks system description information from network devices
-4. **device_inventory**: SNMP-based inventory collection (system info, interfaces, IP addresses, hardware)
+4. **check_bgp_peers**: Monitors BGP peer sessions via BGP4-MIB
+5. **device_inventory**: SNMP-based inventory collection (system info, interfaces, IP addresses, hardware)
 
 ## Installation
 
@@ -109,6 +110,14 @@ Comprehensive SNMP-based inventory collection: system information, interfaces, I
 
 ```bash
 ./cmd/device_inventory/device_inventory -target 192.168.1.1 -community public
+```
+
+### check_bgp_peers
+
+Monitors BGP peer sessions via BGP4-MIB: reports peers whose administrative status and session state are inconsistent. See [cmd/check_bgp_peers/README.md](cmd/check_bgp_peers/README.md) for details.
+
+```bash
+./cmd/check_bgp_peers/check_bgp_peers -target 192.168.1.1 -community public -enablePerfData
 ```
 
 ## Contributing

@@ -1,19 +1,21 @@
-
-
-name: Lint
+name: Vulnerability Scan
 
 on:
   push:
-    branches: [ "main" ]
+    branches:
+      - main
   pull_request:
     branches:
       - main
+  schedule:
+    # Weekly scan: new Go vulnerability database entries appear over time.
+    - cron: '0 6 * * 1'
   workflow_dispatch:
 
 jobs:
-  lint:
-    name: Lint
+  govulncheck:
     runs-on: ubuntu-latest
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -23,12 +25,6 @@ jobs:
       with:
         go-version-file: 'go.mod'
 
-    - name: Install golangci-lint
-      uses: golangci/golangci-lint-action@v7
-      with:
-        version: v2.14.0
-
-    - name: Run linters
+    - name: Run govulncheck
       run: |
-        golangci-lint run ./...
-
+        go run golang.org/x/vuln/cmd/govulncheck@latest ./...

@@ -1,0 +1,42 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version-file: 'go.mod'
+
+    - name: Run tests
+      run: |
+        go test ./...
+
+    - name: Build binaries
+      run: |
+        ./scripts/build-multiplatform.sh "${GITHUB_REF_NAME}"
+
+    - name: Build packages
+      run: |
+        go install github.com/goreleaser/nfpm/v2/cmd/nfpm@latest
+        ./scripts/build-packages.sh "${GITHUB_REF_NAME}"
+
+    - name: Create release and upload artifacts
+      uses: softprops/action-gh-release@v2
+      with:
+        files: |
+          bin/check_*
+          build/package/release/gochecks_*

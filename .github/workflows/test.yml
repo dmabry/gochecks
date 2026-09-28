@@ -3,6 +3,9 @@
 name: Test
 
 on:
+  push:
+    branches:
+      - main
   pull_request:
     branches:
       - main
@@ -21,7 +24,15 @@ jobs:
       with:
         go-version-file: 'go.mod'
 
+    - name: Verify modules
+      run: |
+        go mod verify
+
+    - name: Run static analysis
+      run: |
+        go vet ./...
+
     - name: Run tests
       run: |
-        go test ./...
+        go test -race ./...
 

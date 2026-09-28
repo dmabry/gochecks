@@ -55,7 +55,9 @@ func TestEnablePerfDataFlagWiring(t *testing.T) {
 	result.AddPerformanceData("interfaces", gomonitor.PerformanceMetric{Value: float64(ifaceCount)})
 
 	got := result.FormatResult()
-	if !strings.Contains(got, "'interfaces'=2.00") {
+	// gomonitor v1.4.0+ uses the Icinga 2 number format: integral values
+	// print without trailing decimals, and unset thresholds are omitted.
+	if !strings.Contains(got, "'interfaces'=2") {
 		t.Errorf("FormatResult %q does not contain the interfaces metric", got)
 	}
 }

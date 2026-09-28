@@ -10,6 +10,7 @@ provides:
   - check_interfaces
   - check_sysdescr
   - check_interface_usage
+  - check_bgp_peers
   - device_inventory
 maintainer: "dmabry"
 description: |
@@ -28,6 +29,10 @@ contents:
       mode: 0755
   - src: ./bin/check_sysdescr_linux_amd64
     dst: /usr/lib/nagios/plugins/check_sysdescr
+    file_info:
+      mode: 0755
+  - src: ./bin/check_bgp_peers_linux_amd64
+    dst: /usr/lib/nagios/plugins/check_bgp_peers
     file_info:
       mode: 0755
   - src: ./bin/device_inventory_linux_amd64
