@@ -301,10 +301,10 @@ func DetermineInterfaceUsage(first InterfaceMetrics, second InterfaceMetrics, wa
 	message := fmt.Sprintf("%s - In: %.1f %s Out: %.1f %s HCIn: %.1f %s HCOut: %.1f %s", intName, intIn, intInUnit, intOut, intOutUnit, intHCIn, intHCInUnit, intHCOut, intHCOutUnit)
 	if enablePerf {
 		checkResult.AddPerformanceData("snmp_latency", gomonitor.PerformanceMetric{Value: avgLatency.Seconds(), UnitOM: "s"})
-		checkResult.AddPerformanceData("in", gomonitor.PerformanceMetric{Value: float64(in * 8), Warn: float64(warnIn), Crit: float64(critIn), Min: 0, Max: float64(first.Speed), UnitOM: "bps"})
-		checkResult.AddPerformanceData("out", gomonitor.PerformanceMetric{Value: float64(out * 8), Warn: float64(warnOut), Crit: float64(critOut), Min: 0, Max: float64(first.Speed), UnitOM: "bps"})
-		checkResult.AddPerformanceData("hc_in", gomonitor.PerformanceMetric{Value: float64(hcIn * 8), Warn: float64(warnIn), Crit: float64(critIn), Min: 0, Max: float64(first.Speed), UnitOM: "bps"})
-		checkResult.AddPerformanceData("hc_out", gomonitor.PerformanceMetric{Value: float64(hcOut * 8), Warn: float64(warnOut), Crit: float64(critOut), Min: 0, Max: float64(first.Speed), UnitOM: "bps"})
+		checkResult.AddPerformanceData("in", gomonitor.PerformanceMetric{Value: float64(in * 8), Warn: new(float64(warnIn)), Crit: new(float64(critIn)), Min: new(0.0), Max: new(float64(first.Speed)), UnitOM: "bps"})
+		checkResult.AddPerformanceData("out", gomonitor.PerformanceMetric{Value: float64(out * 8), Warn: new(float64(warnOut)), Crit: new(float64(critOut)), Min: new(0.0), Max: new(float64(first.Speed)), UnitOM: "bps"})
+		checkResult.AddPerformanceData("hc_in", gomonitor.PerformanceMetric{Value: float64(hcIn * 8), Warn: new(float64(warnIn)), Crit: new(float64(critIn)), Min: new(0.0), Max: new(float64(first.Speed)), UnitOM: "bps"})
+		checkResult.AddPerformanceData("hc_out", gomonitor.PerformanceMetric{Value: float64(hcOut * 8), Warn: new(float64(warnOut)), Crit: new(float64(critOut)), Min: new(0.0), Max: new(float64(first.Speed)), UnitOM: "bps"})
 	}
 
 	// Compare in bps: warnIn/critIn/warnOut/critOut are documented in bps, so
