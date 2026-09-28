@@ -1,6 +1,4 @@
-
-
-name: Test
+name: Vulnerability Scan
 
 on:
   push:
@@ -9,10 +7,13 @@ on:
   pull_request:
     branches:
       - main
+  schedule:
+    # Weekly scan: new Go vulnerability database entries appear over time.
+    - cron: '0 6 * * 1'
   workflow_dispatch:
 
 jobs:
-  test:
+  govulncheck:
     runs-on: ubuntu-latest
 
     steps:
@@ -24,15 +25,6 @@ jobs:
       with:
         go-version-file: 'go.mod'
 
-    - name: Verify modules
+    - name: Run govulncheck
       run: |
-        go mod verify
-
-    - name: Run static analysis
-      run: |
-        go vet ./...
-
-    - name: Run tests
-      run: |
-        go test -race ./...
-
+        go run golang.org/x/vuln/cmd/govulncheck@latest ./...
