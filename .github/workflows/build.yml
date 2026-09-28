@@ -26,9 +26,4 @@ jobs:
         go mod download
 
     - name: Build all commands
-      run: |
-        chmod +x scripts/build-multiplatform.sh
-        ./scripts/build-multiplatform.sh test
-
-    - name: List built binaries
-      run: ls -la bin/
+      run: go build -v ./...

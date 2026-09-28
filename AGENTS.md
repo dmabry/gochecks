@@ -24,7 +24,7 @@ go mod tidy                             # Tidy go.mod/go.sum files
 The GitHub workflows in `.github/workflows/` run:
 1. `test.yml` (push/PR to main, manual): `go mod verify`, `go vet ./...`, `go test -race ./...`
 2. `lint.yml` (push/PR to main, manual): `golangci-lint run ./...` (golangci-lint-action@v7, v2.14.0; config in `.golangci.yml`)
-3. `build.yml` (PR to main, manual): `go mod tidy`, `go mod download`, `scripts/build-multiplatform.sh test`
+3. `build.yml` (PR to main, manual): `go mod tidy`, `go mod download`, `go build -v ./...` (multi-platform binaries are only built on release)
 4. `vuln.yml` (push/PR to main, weekly schedule, manual): `govulncheck ./...` against the Go vulnerability database
 5. `release.yml` (tag push `v*`): runs tests, builds multi-platform binaries (`scripts/build-multiplatform.sh`) and RPM/DEB/APK packages (`scripts/build-packages.sh` via nfpm), uploads artifacts to a GitHub Release
 
