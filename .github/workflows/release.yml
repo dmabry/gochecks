@@ -39,4 +39,5 @@ jobs:
       with:
         files: |
           bin/check_*
-          build/package/release/gochecks_*
+          bin/device_inventory_*
+          build/package/release/gochecks*
