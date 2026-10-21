@@ -44,11 +44,8 @@ import (
 //
 // Example usage:
 //
-//	snmpClient := snmp.Client{
-//	    Target:    "127.0.0.1",
-//	    Community: "public",
-//	}
-//	result := CheckSysDescr(&snmpClient, "Cisco", true)
+//	snmpClient, _ := snmp.NewClient("127.0.0.1", "public")
+//	result := CheckSysDescr(snmpClient, "Cisco", true)
 //	result.SendResult()
 func CheckSysDescr(snmpClient *snmp.Client, expectedSysDescrRegExp string, enablePerfData bool) *gomonitor.CheckResult {
 	oids := []string{"1.3.6.1.2.1.1.1.0"}
@@ -109,20 +106,22 @@ func main() {
 
 	version := snmpVersion.VersionOrDefault()
 
-	snmpClient := snmp.Client{
-		Target:    *target,
-		Community: *community,
-		Version:   version,
+	snmpClient, err := snmp.NewClient(*target, *community, snmp.WithSNMPVersion(version))
+	if err != nil {
+		checkResult := gomonitor.NewCheckResult()
+		checkResult.SetResult(gomonitor.Unknown, fmt.Sprintf("failed to configure SNMP client: %v", err))
+		checkResult.SendResult()
+		return
 	}
 
 	if version == gosnmp.Version3 {
-		if err := snmp.ApplyV3Flags(&snmpClient, *v3Username, v3AuthProtocol.Protocol, *v3AuthPassphrase, v3PrivProtocol.Protocol, *v3PrivPassphrase); err != nil {
+		if err := snmp.ApplyV3Flags(snmpClient, *v3Username, v3AuthProtocol.Protocol, *v3AuthPassphrase, v3PrivProtocol.Protocol, *v3PrivPassphrase); err != nil {
 			checkResult := gomonitor.NewCheckResult()
 			checkResult.SetResult(gomonitor.Unknown, err.Error())
 			checkResult.SendResult()
 			return
 		}
 	}
-	result := CheckSysDescr(&snmpClient, *expectedSysDescrRegExp, *enablePerfData)
+	result := CheckSysDescr(snmpClient, *expectedSysDescrRegExp, *enablePerfData)
 	result.SendResult()
 }

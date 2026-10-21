@@ -56,7 +56,7 @@ Each check has its own set of command-line options. Here are some examples:
 ./cmd/check_interfaces/check_interfaces -target 192.168.1.1 -community public
 ```
 
-**Filter by interface description pattern:**
+**Filter by interface description prefix:**
 
 ```bash
 ./cmd/check_interfaces/check_interfaces -target 192.168.1.1 -community public -iface "GigabitEthernet"
@@ -84,13 +84,18 @@ Example with authentication and privacy:
   -v3PrivProtocol AES256 -v3PrivPassphrase ...
 ```
 
+### SNMP retries
+
+Retries are disabled by default. Set `GOCHECKS_SNMP_RETRY_ENABLED=true` (or `1`) to retry transient network failures and SNMP request timeouts. `GOCHECKS_SNMP_MAX_RETRIES` sets the retry count (default 3), and `GOCHECKS_SNMP_RETRY_DELAY` sets the base delay in seconds (default 1) before exponential backoff capped at 30 seconds.
+
 ### check_interfaces Specific Options
 
-- `-iface`: Filter interfaces by description pattern (optional). Only shows interfaces whose description matches this pattern.
+- `-iface`: Filter interfaces by description prefix (optional). Only shows interfaces whose description starts with this value.
+- `-enablePerfData`: Add an `interfaces` performance metric counting the reported interfaces (after filtering).
 
 ### check_interface_usage
 
-Monitors interface usage by taking two measurements separated by a delay and computing traffic rates. Thresholds (`-warnIn`, `-critIn`, `-warnOut`, `-critOut`) are specified in bps.
+Monitors interface usage by taking two measurements separated by a delay and computing traffic rates. Thresholds (`-warnIn`, `-critIn`, `-warnOut`, `-critOut`) are specified in bps; a threshold of `0` (the default) disables that threshold.
 
 ```bash
 ./cmd/check_interface_usage/check_interface_usage -target 192.168.1.1 -community public -index 2 -delay 10 -warnIn 500000000 -critIn 900000000 -enablePerfData

@@ -154,13 +154,23 @@ func filterInterfacesByDescription(result *gomonitor.CheckResult, ifaceDesc stri
 	return filteredResult
 }
 
+// addInterfacePerfData adds the interface count metric when enabled and the
+// result is OK. It runs after description filtering so the metric reflects the
+// interfaces actually reported.
+func addInterfacePerfData(result *gomonitor.CheckResult, enabled bool) {
+	if !enabled || result.ExitCode != gomonitor.OK {
+		return
+	}
+	result.AddPerformanceData("interfaces", gomonitor.PerformanceMetric{Value: float64(countInterfaces(result.Message))})
+}
+
 // main is the entry point of the program. It parses command-line flags, creates an SNMP client,
 // and performs a check on the target SNMP device using the CheckInterfaceMetrics function.
 // The result of the check is then sent using the SendResult method.
 func main() {
 	target := flag.String("target", "127.0.0.1", "The target SNMP device.")
 	community := flag.String("community", "public", "The SNMP community string.")
-	ifaceDesc := flag.String("iface", "", "Filter interfaces by description (optional).")
+	ifaceDesc := flag.String("iface", "", "Filter interfaces by description prefix (optional).")
 	enablePerfData := flag.Bool("enablePerfData", false, "Enable performance data. Adds the interface count as a performance metric.")
 	snmpVersion := &snmp.SNMPVersionFlag{}
 	flag.Var(snmpVersion, "snmpVersion", "SNMP protocol version: 2c or 3 (default 2c).")
@@ -169,31 +179,27 @@ func main() {
 
 	version := snmpVersion.VersionOrDefault()
 
-	snmpClient := snmp.Client{
-		Target:    *target,
-		Community: *community,
-		Version:   version,
+	snmpClient, err := snmp.NewClient(*target, *community, snmp.WithSNMPVersion(version))
+	if err != nil {
+		checkResult := gomonitor.NewCheckResult()
+		checkResult.SetResult(gomonitor.Unknown, fmt.Sprintf("failed to configure SNMP client: %v", err))
+		checkResult.SendResult()
+		return
 	}
 
 	if version == gosnmp.Version3 {
-		if err := snmp.ApplyV3Flags(&snmpClient, *v3Username, v3AuthProtocol.Protocol, *v3AuthPassphrase, v3PrivProtocol.Protocol, *v3PrivPassphrase); err != nil {
+		if err := snmp.ApplyV3Flags(snmpClient, *v3Username, v3AuthProtocol.Protocol, *v3AuthPassphrase, v3PrivProtocol.Protocol, *v3PrivPassphrase); err != nil {
 			checkResult := gomonitor.NewCheckResult()
 			checkResult.SetResult(gomonitor.Unknown, err.Error())
 			checkResult.SendResult()
 			return
 		}
 	}
-	result := CheckInterfaceMetrics(&snmpClient)
-
-	if *enablePerfData {
-		ifaceCount := countInterfaces(result.Message)
-		result.AddPerformanceData("interfaces", gomonitor.PerformanceMetric{Value: float64(ifaceCount)})
-	}
+	result := CheckInterfaceMetrics(snmpClient)
 
 	if *ifaceDesc != "" {
-		filteredResult := filterInterfacesByDescription(result, *ifaceDesc)
-		filteredResult.SendResult()
-	} else {
-		result.SendResult()
+		result = filterInterfacesByDescription(result, *ifaceDesc)
 	}
+	addInterfacePerfData(result, *enablePerfData)
+	result.SendResult()
 }

@@ -242,6 +242,42 @@ func varbindUint64(value interface{}) (uint64, error) {
 	}
 }
 
+// counterDelta32 returns the octet increase between two samples of a 32-bit
+// counter, accounting for wrap at 2^32. A decrease is treated as a wrap; a
+// device reboot also resets the HC counters, which is detected separately.
+func counterDelta32(previous, current uint) uint64 {
+	if current >= previous {
+		return uint64(current - previous)
+	}
+	return uint64(current) + (uint64(1) << 32) - uint64(previous)
+}
+
+// counterDelta64 returns the octet increase between two samples of a 64-bit
+// counter and whether the samples are monotonic. A decrease indicates a
+// counter reset or discontinuity, so the rate across it is undefined.
+func counterDelta64(previous, current uint64) (uint64, bool) {
+	if current >= previous {
+		return current - previous, true
+	}
+	return 0, false
+}
+
+// exceeds reports whether value is above threshold. Thresholds at or below
+// zero are disabled, which matches the flag defaults and avoids alerting on
+// any nonzero traffic when no thresholds are supplied.
+func exceeds(value uint64, threshold int) bool {
+	return threshold > 0 && value > uint64(threshold)
+}
+
+// thresholdPtr returns a performance-data threshold pointer, or nil when the
+// threshold is disabled so it is omitted from the perfdata output.
+func thresholdPtr(threshold int) *float64 {
+	if threshold <= 0 {
+		return nil
+	}
+	return new(float64(threshold))
+}
+
 // DetermineInterfaceUsage calculates the usage of a network interface based on the provided InterfaceMetrics.
 // It compares the metrics between two time periods and determines if the inbound and outbound traffic exceeds
 // the given warning and critical thresholds. It also converts the traffic values to the appropriate scale (bps,
@@ -281,13 +317,29 @@ func DetermineInterfaceUsage(first InterfaceMetrics, second InterfaceMetrics, wa
 	}
 
 	avgLatency := (first.Latency + second.Latency) / 2
+
+	// Counters can wrap (32-bit counters wrap frequently on high-speed links)
+	// or reset (device reboot, counter clear). Compute deltas with wrap
+	// handling for 32-bit counters; a decreasing 64-bit counter is a reset,
+	// so the rate across it is undefined.
+	inDelta := counterDelta32(first.In, second.In)
+	outDelta := counterDelta32(first.Out, second.Out)
+	hcInDelta, hcInMonotonic := counterDelta64(first.HCIn, second.HCIn)
+	hcOutDelta, hcOutMonotonic := counterDelta64(first.HCOut, second.HCOut)
+	if !hcInMonotonic || !hcOutMonotonic {
+		checkResult.SetResult(gomonitor.Unknown, fmt.Sprintf(
+			"counter reset or discontinuity between measurements (HCIn %d -> %d, HCOut %d -> %d); unable to compute a rate",
+			first.HCIn, second.HCIn, first.HCOut, second.HCOut))
+		return checkResult
+	}
+
 	// Calc rates. Floating-point division is used so sub-second measurement
 	// periods work correctly; integer division with uint(period) would
 	// truncate a 0.5s period to 0 and divide by zero.
-	inRate := float64(second.In-first.In) / period
-	outRate := float64(second.Out-first.Out) / period
-	hcInRate := float64(second.HCIn-first.HCIn) / period
-	hcOutRate := float64(second.HCOut-first.HCOut) / period
+	inRate := float64(inDelta) / period
+	outRate := float64(outDelta) / period
+	hcInRate := float64(hcInDelta) / period
+	hcOutRate := float64(hcOutDelta) / period
 	in := uint64(inRate)
 	out := uint64(outRate)
 	hcIn := uint64(hcInRate)
@@ -301,10 +353,10 @@ func DetermineInterfaceUsage(first InterfaceMetrics, second InterfaceMetrics, wa
 	message := fmt.Sprintf("%s - In: %.1f %s Out: %.1f %s HCIn: %.1f %s HCOut: %.1f %s", intName, intIn, intInUnit, intOut, intOutUnit, intHCIn, intHCInUnit, intHCOut, intHCOutUnit)
 	if enablePerf {
 		checkResult.AddPerformanceData("snmp_latency", gomonitor.PerformanceMetric{Value: avgLatency.Seconds(), UnitOM: "s"})
-		checkResult.AddPerformanceData("in", gomonitor.PerformanceMetric{Value: float64(in * 8), Warn: new(float64(warnIn)), Crit: new(float64(critIn)), Min: new(0.0), Max: new(float64(first.Speed)), UnitOM: "bps"})
-		checkResult.AddPerformanceData("out", gomonitor.PerformanceMetric{Value: float64(out * 8), Warn: new(float64(warnOut)), Crit: new(float64(critOut)), Min: new(0.0), Max: new(float64(first.Speed)), UnitOM: "bps"})
-		checkResult.AddPerformanceData("hc_in", gomonitor.PerformanceMetric{Value: float64(hcIn * 8), Warn: new(float64(warnIn)), Crit: new(float64(critIn)), Min: new(0.0), Max: new(float64(first.Speed)), UnitOM: "bps"})
-		checkResult.AddPerformanceData("hc_out", gomonitor.PerformanceMetric{Value: float64(hcOut * 8), Warn: new(float64(warnOut)), Crit: new(float64(critOut)), Min: new(0.0), Max: new(float64(first.Speed)), UnitOM: "bps"})
+		checkResult.AddPerformanceData("in", gomonitor.PerformanceMetric{Value: inRate * 8, Warn: thresholdPtr(warnIn), Crit: thresholdPtr(critIn), Min: new(0.0), Max: new(float64(first.Speed)), UnitOM: "bps"})
+		checkResult.AddPerformanceData("out", gomonitor.PerformanceMetric{Value: outRate * 8, Warn: thresholdPtr(warnOut), Crit: thresholdPtr(critOut), Min: new(0.0), Max: new(float64(first.Speed)), UnitOM: "bps"})
+		checkResult.AddPerformanceData("hc_in", gomonitor.PerformanceMetric{Value: hcInRate * 8, Warn: thresholdPtr(warnIn), Crit: thresholdPtr(critIn), Min: new(0.0), Max: new(float64(first.Speed)), UnitOM: "bps"})
+		checkResult.AddPerformanceData("hc_out", gomonitor.PerformanceMetric{Value: hcOutRate * 8, Warn: thresholdPtr(warnOut), Crit: thresholdPtr(critOut), Min: new(0.0), Max: new(float64(first.Speed)), UnitOM: "bps"})
 	}
 
 	// Compare in bps: warnIn/critIn/warnOut/critOut are documented in bps, so
@@ -312,21 +364,31 @@ func DetermineInterfaceUsage(first InterfaceMetrics, second InterfaceMetrics, wa
 	// (octets * 8), not the human-scaled values (Kbps/Mbps/Gbps) which only
 	// belong in the message. Comparing scaled values against bps thresholds
 	// silently disabled alerting.
-	inBps := uint64(in * 8)
-	outBps := uint64(out * 8)
-	hcInBps := hcIn * 8
-	hcOutBps := hcOut * 8
+	inBps := uint64(inRate * 8)
+	outBps := uint64(outRate * 8)
+	hcInBps := uint64(hcInRate * 8)
+	hcOutBps := uint64(hcOutRate * 8)
+
+	// Prefer the 64-bit HC counters for threshold evaluation: they do not
+	// wrap in practice and avoid the 32-bit wrap-versus-reset ambiguity. Fall
+	// back to the wrap-corrected 32-bit counters when the device reports no
+	// HC counter activity (some agents return 0 for unsupported columns).
+	thresholdInBps, thresholdOutBps := hcInBps, hcOutBps
+	if first.HCIn == 0 && second.HCIn == 0 && first.HCOut == 0 && second.HCOut == 0 {
+		thresholdInBps, thresholdOutBps = inBps, outBps
+	}
 
 	// Evaluate critical thresholds for both directions before warnings so an
-	// inbound warning cannot mask an outbound critical.
+	// inbound warning cannot mask an outbound critical. A zero threshold (the
+	// flag default) disables that threshold.
 	switch {
-	case inBps > uint64(critIn) || hcInBps > uint64(critIn):
+	case exceeds(thresholdInBps, critIn):
 		checkResult.SetResult(gomonitor.Critical, "Inbound exceeds threshold "+message)
-	case outBps > uint64(critOut) || hcOutBps > uint64(critOut):
+	case exceeds(thresholdOutBps, critOut):
 		checkResult.SetResult(gomonitor.Critical, "Outbound exceeds threshold "+message)
-	case inBps > uint64(warnIn) || hcInBps > uint64(warnIn):
+	case exceeds(thresholdInBps, warnIn):
 		checkResult.SetResult(gomonitor.Warning, "Inbound exceeds threshold "+message)
-	case outBps > uint64(warnOut) || hcOutBps > uint64(warnOut):
+	case exceeds(thresholdOutBps, warnOut):
 		checkResult.SetResult(gomonitor.Warning, "Outbound exceeds threshold "+message)
 	default:
 		checkResult.SetResult(gomonitor.OK, message)
@@ -340,10 +402,10 @@ func main() {
 	index := flag.Int("index", 1, "The index of the Interface")
 	delay := flag.Int("delay", 10, "The delay in seconds to wait between measurements")
 	enablePerfData := flag.Bool("enablePerfData", false, "Enable performance data. Default is false.")
-	warnIn := flag.Int("warnIn", 0, "Warning level for inbound in bps. Default is 0.")
-	critIn := flag.Int("critIn", 0, "Critical level for inbound in bps. Default is 0.")
-	warnOut := flag.Int("warnOut", 0, "Warning level for outbound in bps. Default is 0.")
-	critOut := flag.Int("critOut", 0, "Critical level for outbound bps. Default is 0.")
+	warnIn := flag.Int("warnIn", 0, "Warning level for inbound in bps. 0 disables the threshold.")
+	critIn := flag.Int("critIn", 0, "Critical level for inbound in bps. 0 disables the threshold.")
+	warnOut := flag.Int("warnOut", 0, "Warning level for outbound in bps. 0 disables the threshold.")
+	critOut := flag.Int("critOut", 0, "Critical level for outbound bps. 0 disables the threshold.")
 	checkStatus := flag.Bool("checkStatus", true, "Check interface admin/oper status before measuring. Returns Critical if the interface is down.")
 	snmpVersion := &snmp.SNMPVersionFlag{}
 	flag.Var(snmpVersion, "snmpVersion", "SNMP protocol version: 2c or 3 (default 2c).")
@@ -352,14 +414,16 @@ func main() {
 
 	version := snmpVersion.VersionOrDefault()
 
-	snmpClient := snmp.Client{
-		Target:    *target,
-		Community: *community,
-		Version:   version,
+	snmpClient, err := snmp.NewClient(*target, *community, snmp.WithSNMPVersion(version))
+	if err != nil {
+		checkResult := gomonitor.NewCheckResult()
+		checkResult.SetResult(gomonitor.Unknown, fmt.Sprintf("failed to configure SNMP client: %v", err))
+		checkResult.SendResult()
+		return
 	}
 
 	if version == gosnmp.Version3 {
-		if err := snmp.ApplyV3Flags(&snmpClient, *v3Username, v3AuthProtocol.Protocol, *v3AuthPassphrase, v3PrivProtocol.Protocol, *v3PrivPassphrase); err != nil {
+		if err := snmp.ApplyV3Flags(snmpClient, *v3Username, v3AuthProtocol.Protocol, *v3AuthPassphrase, v3PrivProtocol.Protocol, *v3PrivPassphrase); err != nil {
 			checkResult := gomonitor.NewCheckResult()
 			checkResult.SetResult(gomonitor.Unknown, err.Error())
 			checkResult.SendResult()
@@ -369,7 +433,7 @@ func main() {
 
 	// Determine Interface Status before proceeding
 	if *checkStatus {
-		status, err := GetInterfaceStatus(&snmpClient, *index)
+		status, err := GetInterfaceStatus(snmpClient, *index)
 		if err != nil {
 			checkResult := gomonitor.NewCheckResult()
 			eMessage := fmt.Sprintf("SNMP target %s failed to return data when getting interface status. %s", snmpClient.Target, err)
@@ -387,7 +451,7 @@ func main() {
 		}
 	}
 
-	measure1, err1 := GetInterfaceMetrics(&snmpClient, *index)
+	measure1, err1 := GetInterfaceMetrics(snmpClient, *index)
 	if err1 != nil {
 		checkResult := gomonitor.NewCheckResult()
 		eMessage := fmt.Sprintf("SNMP target %s failed to return data when measuring metrics. %s", snmpClient.Target, err1)
@@ -399,7 +463,7 @@ func main() {
 	// delay
 	time.Sleep(time.Duration(*delay) * time.Second)
 
-	measure2, err2 := GetInterfaceMetrics(&snmpClient, *index)
+	measure2, err2 := GetInterfaceMetrics(snmpClient, *index)
 	if err2 != nil {
 		checkResult := gomonitor.NewCheckResult()
 		eMessage := fmt.Sprintf("SNMP target %s failed to return data when measuring metrics. %s", snmpClient.Target, err2)

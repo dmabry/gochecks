@@ -17,9 +17,11 @@
 package main
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/dmabry/gochecks/internal/interfaces"
+	"github.com/dmabry/gomonitor"
 )
 
 func TestSetField(t *testing.T) {
@@ -98,5 +100,55 @@ func TestCheckInterfaceMetrics(t *testing.T) {
 }
 
 func TestFilterInterfacesByDescription(t *testing.T) {
-	t.Skip("Requires gomonitor mock implementation")
+	message := "Interface index: 1\nDescription: GigabitEthernet0/1\nAlias: uplink\n\n" +
+		"Interface index: 2\nDescription: GigabitEthernet0/2\nAlias: access\n\n"
+	result := gomonitor.NewCheckResult()
+	result.SetResult(gomonitor.OK, message)
+
+	filtered := filterInterfacesByDescription(result, "GigabitEthernet0/2")
+	if filtered.ExitCode != gomonitor.OK {
+		t.Fatalf("filtered ExitCode = %s, want OK", filtered.ExitCode)
+	}
+	if strings.Contains(filtered.Message, "GigabitEthernet0/1") {
+		t.Errorf("filtered message still contains the non-matching interface: %q", filtered.Message)
+	}
+	if !strings.Contains(filtered.Message, "GigabitEthernet0/2") {
+		t.Errorf("filtered message does not contain the matching interface: %q", filtered.Message)
+	}
+
+	none := filterInterfacesByDescription(result, "Loopback")
+	if none.ExitCode != gomonitor.Critical {
+		t.Errorf("no-match ExitCode = %s, want Critical", none.ExitCode)
+	}
+}
+
+// TestAddInterfacePerfDataAfterFiltering verifies the interface count metric
+// is computed after filtering. Regression: the metric was added to the
+// unfiltered result, so -iface silently dropped all performance data.
+func TestAddInterfacePerfDataAfterFiltering(t *testing.T) {
+	message := "Interface index: 1\nDescription: eth0\nAlias: uplink\n\n" +
+		"Interface index: 2\nDescription: eth1\nAlias: access\n\n"
+	result := gomonitor.NewCheckResult()
+	result.SetResult(gomonitor.OK, message)
+
+	filtered := filterInterfacesByDescription(result, "eth1")
+	addInterfacePerfData(filtered, true)
+
+	metric, ok := filtered.PerformanceData["interfaces"]
+	if !ok {
+		t.Fatal("filtered result is missing the 'interfaces' performance metric")
+	}
+	if metric.Value != 1 {
+		t.Errorf("interfaces metric = %v, want 1 (filtered count)", metric.Value)
+	}
+	if !strings.Contains(filtered.FormatResult(), "'interfaces'=1") {
+		t.Errorf("FormatResult() = %q, want it to contain 'interfaces'=1", filtered.FormatResult())
+	}
+
+	// A disabled or non-OK result must not carry a misleading metric.
+	none := filterInterfacesByDescription(result, "Loopback")
+	addInterfacePerfData(none, true)
+	if _, ok := none.PerformanceData["interfaces"]; ok {
+		t.Error("non-OK filtered result should not have an 'interfaces' metric")
+	}
 }

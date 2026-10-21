@@ -33,6 +33,7 @@ func TestIsRetryableErr(t *testing.T) {
 		{name: "connection refused", err: errors.New("connection refused"), want: true},
 		{name: "no route to host", err: errors.New("no route to host"), want: true},
 		{name: "timeout waiting for response", err: errors.New("timeout waiting for response"), want: true},
+		{name: "gosnmp request timeout", err: errors.New("request timeout (after 3 retries)"), want: true},
 		{name: "use closed connection", err: errors.New("use of closed network connection"), want: true},
 		{name: "network unreachable", err: errors.New("network is unreachable"), want: true},
 		{name: "i/o timeout", err: errors.New("i/o timeout"), want: true},
@@ -197,17 +198,25 @@ func TestContextCancellationDuringBackoff(t *testing.T) {
 func TestRetryPolicyFromEnv(t *testing.T) {
 	tests := []struct {
 		name         string
+		env          map[string]string
 		retryEnabled bool
 		maxRetries   int
-		setupEnv     func()
 	}{
-		{name: "default when unset", retryEnabled: false, maxRetries: defaultMaxRetries, setupEnv: func() {}},
+		{name: "default when unset", retryEnabled: false, maxRetries: defaultMaxRetries},
+		{name: "enabled with true", env: map[string]string{"GOCHECKS_SNMP_RETRY_ENABLED": "true"}, retryEnabled: true, maxRetries: defaultMaxRetries},
+		{name: "enabled with 1", env: map[string]string{"GOCHECKS_SNMP_RETRY_ENABLED": "1"}, retryEnabled: true, maxRetries: defaultMaxRetries},
+		{name: "max retries override", env: map[string]string{"GOCHECKS_SNMP_MAX_RETRIES": "5"}, retryEnabled: false, maxRetries: 5},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tt.setupEnv()
+			for key, value := range tt.env {
+				t.Setenv(key, value)
+			}
 			policy := retryPolicyFromEnv()
+			if policy.Enabled != tt.retryEnabled {
+				t.Errorf("retryPolicyFromEnv() Enabled = %v, want %v", policy.Enabled, tt.retryEnabled)
+			}
 			if policy.MaxRetries != tt.maxRetries {
 				t.Errorf("retryPolicyFromEnv() MaxRetries = %d, want %d", policy.MaxRetries, tt.maxRetries)
 			}

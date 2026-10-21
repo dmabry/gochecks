@@ -16,11 +16,17 @@
 - `-index`: The index of the interface to monitor (default: 1)
 - `-delay`: The delay in seconds to wait between the two measurements (default: 10)
 - `-enablePerfData`: Enable performance data output (default: false)
-- `-warnIn`: Warning threshold for inbound traffic in bps (default: 0)
-- `-critIn`: Critical threshold for inbound traffic in bps (default: 0)
-- `-warnOut`: Warning threshold for outbound traffic in bps (default: 0)
-- `-critOut`: Critical threshold for outbound traffic in bps (default: 0)
+- `-warnIn`: Warning threshold for inbound traffic in bps (default: 0, disabled)
+- `-critIn`: Critical threshold for inbound traffic in bps (default: 0, disabled)
+- `-warnOut`: Warning threshold for outbound traffic in bps (default: 0, disabled)
+- `-critOut`: Critical threshold for outbound traffic in bps (default: 0, disabled)
 - `-checkStatus`: Check the interface admin/oper status before measuring and return Critical if the interface is down (default: true). Set to `false` to measure regardless of interface status.
+
+## Thresholds and Counters
+
+A threshold of `0` (the default) disables that threshold. Thresholds are compared against bits-per-second rates, not the human-scaled Kbps/Mbps/Gbps values shown in the message.
+
+Threshold evaluation prefers the 64-bit high-capacity counters (`ifHCInOctets`, `ifHCOutOctets`) and falls back to the wrap-corrected 32-bit counters when the device reports no HC counter activity. If a 64-bit counter decreases between measurements, the check returns `Unknown` because the rate across a reset or discontinuity is undefined.
 
 ## Interface Status Check
 

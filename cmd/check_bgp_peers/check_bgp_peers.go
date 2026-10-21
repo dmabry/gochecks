@@ -95,11 +95,8 @@ func (bp BgpPeer) hasAdminStateMismatch() bool {
 //
 // Example usage:
 //
-//	snmpClient := snmp.Client{
-//	    Target:    "127.0.0.1",
-//	    Community: "public",
-//	}
-//	result := CheckBgpPeers(&snmpClient, true)
+//	snmpClient, _ := snmp.NewClient("127.0.0.1", "public")
+//	result := CheckBgpPeers(snmpClient, true)
 //	result.SendResult()
 func CheckBgpPeers(snmpClient *snmp.Client, enablePerfData bool) *gomonitor.CheckResult {
 	peers, err := GetBgpPeers(snmpClient)
@@ -200,20 +197,22 @@ func main() {
 
 	version := snmpVersion.VersionOrDefault()
 
-	snmpClient := snmp.Client{
-		Target:    *target,
-		Community: *community,
-		Version:   version,
+	snmpClient, err := snmp.NewClient(*target, *community, snmp.WithSNMPVersion(version))
+	if err != nil {
+		checkResult := gomonitor.NewCheckResult()
+		checkResult.SetResult(gomonitor.Unknown, fmt.Sprintf("failed to configure SNMP client: %v", err))
+		checkResult.SendResult()
+		return
 	}
 
 	if version == gosnmp.Version3 {
-		if err := snmp.ApplyV3Flags(&snmpClient, *v3Username, v3AuthProtocol.Protocol, *v3AuthPassphrase, v3PrivProtocol.Protocol, *v3PrivPassphrase); err != nil {
+		if err := snmp.ApplyV3Flags(snmpClient, *v3Username, v3AuthProtocol.Protocol, *v3AuthPassphrase, v3PrivProtocol.Protocol, *v3PrivPassphrase); err != nil {
 			checkResult := gomonitor.NewCheckResult()
 			checkResult.SetResult(gomonitor.Unknown, err.Error())
 			checkResult.SendResult()
 			return
 		}
 	}
-	result := CheckBgpPeers(&snmpClient, *enablePerfData)
+	result := CheckBgpPeers(snmpClient, *enablePerfData)
 	result.SendResult()
 }
