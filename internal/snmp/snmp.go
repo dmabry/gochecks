@@ -243,6 +243,7 @@ func isRetryableErr(err error) bool {
 		"connection refused",
 		"no route to host",
 		"timeout waiting for response",
+		"request timeout",
 		"use of closed network connection",
 		"network is unreachable",
 		"i/o timeout",

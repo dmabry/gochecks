@@ -547,19 +547,18 @@ func main() {
 
 	version := snmpVersion.VersionOrDefault()
 
-	snmpClient := snmp.Client{
-		Target:    *target,
-		Community: *community,
-		Version:   version,
+	snmpClient, err := snmp.NewClient(*target, *community, snmp.WithSNMPVersion(version))
+	if err != nil {
+		log.Fatalf("Invalid SNMP configuration: %v", err)
 	}
 
 	if version == gosnmp.Version3 {
-		if err := snmp.ApplyV3Flags(&snmpClient, *v3Username, v3AuthProtocol.Protocol, *v3AuthPassphrase, v3PrivProtocol.Protocol, *v3PrivPassphrase); err != nil {
+		if err := snmp.ApplyV3Flags(snmpClient, *v3Username, v3AuthProtocol.Protocol, *v3AuthPassphrase, v3PrivProtocol.Protocol, *v3PrivPassphrase); err != nil {
 			log.Fatalf("Invalid SNMP v3 configuration: %v", err)
 		}
 	}
 
-	result, err := CollectDeviceInventory(&snmpClient)
+	result, err := CollectDeviceInventory(snmpClient)
 	if err != nil {
 		log.Fatalf("Error collecting inventory: %v", err)
 	}
